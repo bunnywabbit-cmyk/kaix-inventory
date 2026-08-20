@@ -1,9 +1,11 @@
-// In dev this is left unset and stays "/api" — Vite's dev server proxies that
-// to localhost:4000 (see vite.config.ts), so frontend and backend appear
-// same-origin to the browser. In production the built frontend (Vercel) and
-// backend (Render) are on different domains with no such proxy, so the full
-// backend URL has to be baked in at build time via this env var.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+// Always same-origin: in dev, Vite's dev server proxies /api to
+// localhost:4000 (see vite.config.ts); in production, client/vercel.json
+// rewrites /api on the Vercel domain to the Render backend. Neither the
+// browser nor the access_token cookie ever sees the backend's real domain —
+// which matters because Safari blocks cookies set across a genuine
+// cross-site request (SameSite=None isn't enough for it), so routing
+// everything through one origin sidesteps that instead of fighting it.
+const API_BASE = "/api";
 
 // AuthContext registers a handler here so a 401 from *any* call — not just
 // the initial /me check — immediately drops the app back to the login page
