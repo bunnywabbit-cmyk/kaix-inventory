@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PrintType {
+  SILKSCREEN
+  DTF
+}
+
+enum ScreenStatus {
+  CLEAN_RECLAIMED
+  COATED_EMULSION
+  DEVELOPED
+  EXPOSED_READY
+  ON_PRESS
+  NEEDS_RECLAIM
+}
+
+enum PrintRunStatus {
+  PLANNED
+  FINISHED
+}
+
+enum DtfPrintSize {
+  A4
+  A3
+  A3_PLUS
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  // Optional 6-digit PIN, hashed the same way as the password — lets this
+  // account also sign in via the PIN pad instead of typing email/password.
+  pinHash      String?
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rawMaterials RawMaterial[]
+}
+
+model RawMaterial {
+  id           String  @id @default(uuid())
+  name         String
+  sku          String  @unique
+  quantity     Int     @default(0)
+  reorderLevel Int     @default(0)
+  // Cost tracking — applies the same way to blank apparel and consumables
+  // alike, both optional since not every item's cost is known up front.
+  pricePerUnit Float?
+  courierFee   Float?
+
+  brand       String?
+  styleNumber String?
+  color       String?
+  size        String?
+  unit        String?
+  imageUrl    String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+}
+
+model ShirtDesign {
+  id               String    @id @default(uuid())
+  designName       String
+  printType        PrintType
+  mainProductImage String
+  availableFits    String[]  @default([])
+  // Default sale price per piece for this design — pre-fills FinishedGood's
+  // unitPrice when new stock is added, but each variant can still override it.
+  price            Float?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  colorways     DesignColorway[]
+  finishedGoods FinishedGood[]
+  printRunItems PrintRunItem[]
+  sales         Sale[]
+
+  @@index([createdAt])
+}
+
+model DesignColorway {
+  id           String @id @default(uuid())
+  colorwayName String
+  imageUrl     String
+  // Sheet size for DTF designs — unique per colorway, the same way a
+  // silkscreen colorway links to its own screen. Set on the Designs page,
+  // not per order.
+  dtfPrintSize DtfPrintSize?
+
+  shirtDesignId String
+  shirtDesign   ShirtDesign @relation(fields: [shirtDesignId], references: [id], onDelete: Cascade)
+
+  finishedGoods  FinishedGood[]
+  printRunItems  PrintRunItem[]
+  dtfPrintOrders DtfPrintOrder[]
+  // A colorway can need more than one screen (e.g. halftone separations), and a
+  // single screen can cover multiple colorways (e.g. a one-color logo printed on
+  // several shirt colors) — genuinely many-to-many, not a capped 1:1/1:2 link.
+  screens        PhysicalScreen[] @relation("ScreenColorways")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shirtDesignId])
+}
+
+model PhysicalScreen {
+  id           String       @id @default(uuid())
+  screenNumber String       @unique
+  meshCount    Int
+  frameType    String
+  frameSize    String?
+  status       ScreenStatus @default(CLEAN_RECLAIMED)
+
+  colorways DesignColorway[] @relation("ScreenColorways")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model FinishedGood {
+  id             String @id @default(uuid())
+  garmentStyle   String
+  color          String
+  size           String
+  quantityOnHand Int    @default(0)
+  unitPrice      Float?
+
+  designId String
+  design   ShirtDesign @relation(fields: [designId], references: [id])
+
+  colorwayId String?
+  colorway   DesignColorway? @relation(fields: [colorwayId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales Sale[]
+
+  @@index([designId])
+  @@index([colorwayId])
+  @@index([createdAt])
+}
+
+// A production batch that can cover several designs at once — e.g. one run
+// might print 3 different designs together. Planned runs are freely editable;
+// finishing one is a one-way step that deducts the matching blank-shirt raw
+// materials for every design/colorway/fit/size line and locks the record as
+// a log entry.
+model PrintRun {
+  id         String         @id @default(uuid())
+  status     PrintRunStatus @default(PLANNED)
+  finishedAt DateTime?
+
+  items PrintRunItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// One design + colorway + fit line within a print run.
+model PrintRunItem {
+  id           String  @id @default(uuid())
+  garmentStyle String
+  color        String
+  // Tracks production progress on this design specifically — independent of
+  // the run's own status, which only governs the raw-material deduction step.
+  done         Boolean @default(false)
+
+  printRunId String
+  printRun   PrintRun @relation(fields: [printRunId], references: [id], onDelete: Cascade)
+
+  designId String
+  design   ShirtDesign @relation(fields: [designId], references: [id])
+
+  colorwayId String?
+  colorway   DesignColorway? @relation(fields: [colorwayId], references: [id])
+
+  sizes PrintRunSize[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([printRunId])
+  @@index([designId])
+  @@index([colorwayId])
+  @@index([done])
+}
+
+model PrintRunSize {
+  id       String @id @default(uuid())
+  size     String
+  quantity Int
+
+  printRunItemId String
+  printRunItem   PrintRunItem @relation(fields: [printRunItemId], references: [id], onDelete: Cascade)
+
+  @@index([printRunItemId])
+}
+
+// A to-order line: a colorway's print file (and size, set on the colorway
+// itself) plus a quantity still owed to the outsourced print partner.
+// `ordered` is flipped manually once it's actually been sent — the sending
+// itself happens outside the app, this just tracks where each line stands.
+model DtfPrintOrder {
+  id String @id @default(uuid())
+
+  colorwayId String
+  colorway   DesignColorway @relation(fields: [colorwayId], references: [id])
+  quantity   Int
+  ordered    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([colorwayId])
+  @@index([createdAt])
+  @@index([ordered])
+}
+
+// A record of finished goods sold, written server-side whenever a stock
+// adjustment on a FinishedGood has a negative delta (selling, not
+// restocking) — see finishedGoods.ts's adjust-stock route. This is the only
+// source of truth for revenue/sales-analytics reporting, since the stock
+// count itself is just a decrement with no history of its own.
+// designName/garmentStyle/color/size are snapshotted at sale time so
+// historical figures stay meaningful even if the source FinishedGood or
+// ShirtDesign is later edited or deleted — hence the nullable relations
+// with onDelete: SetNull, rather than blocking those deletes or losing
+// the sales record along with them.
+model Sale {
+  id String @id @default(uuid())
+
+  finishedGoodId String?
+  finishedGood   FinishedGood? @relation(fields: [finishedGoodId], references: [id], onDelete: SetNull)
+
+  designId String?
+  design   ShirtDesign? @relation(fields: [designId], references: [id], onDelete: SetNull)
+
+  designName   String
+  garmentStyle String
+  color        String
+  size         String
+
+  quantity Int
+  // Unit price and total captured at sale time — protects historical
+  // revenue even if the FinishedGood's unitPrice changes afterward.
+  unitPrice  Float?
+  totalPrice Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([finishedGoodId])
+  @@index([designId])
+  @@index([createdAt])
+}
