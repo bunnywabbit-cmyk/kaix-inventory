@@ -26,7 +26,8 @@ function PriceInput({
   className = '',
   ariaLabel,
 }: PriceInputProps) {
-  const paddingClass = dense ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'
+  const paddingClass = dense ? 'py-1.5 pl-5 pr-2 text-xs' : 'py-2 pl-7 pr-3 text-sm'
+  const signClass = dense ? 'pl-2 text-xs' : 'pl-3 text-sm'
 
   // Snaps to two decimal places once the user leaves the field, rather than
   // fighting their typing (e.g. "5." or "5.5") on every keystroke.
@@ -39,11 +40,9 @@ function PriceInput({
   }
 
   return (
-    <div
-      className={`flex items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 ${className}`}
-    >
+    <div className={`relative ${className}`}>
       <span
-        className={`flex shrink-0 items-center border-r border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 ${paddingClass}`}
+        className={`pointer-events-none absolute inset-y-0 left-0 flex items-center text-slate-500 dark:text-slate-400 ${signClass}`}
       >
         &#8369;
       </span>
@@ -57,7 +56,7 @@ function PriceInput({
         onBlur={handleBlur}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className={`w-full min-w-0 bg-transparent text-slate-900 outline-none dark:text-slate-100 ${paddingClass} ${noSpinnerClass}`}
+        className={`w-full rounded-lg border border-slate-200 bg-white text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 ${paddingClass} ${noSpinnerClass}`}
       />
     </div>
   )

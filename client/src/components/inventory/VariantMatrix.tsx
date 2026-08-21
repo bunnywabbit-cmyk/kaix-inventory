@@ -11,9 +11,9 @@ interface VariantMatrixProps {
   onQuantityChange: (color: string, size: string, value: number) => void
   skuFor: (color: string, size: string) => string
   onRemoveColor: (color: string) => void
-  /** Price per piece, keyed by size — prices vary by size, not by color. */
-  pricesBySize: Record<string, string>
-  onPriceChange: (size: string, value: string) => void
+  /** Price per piece, keyed by cellKey(color, size) — each colorway/size combo can have its own price. */
+  pricesByVariant: Record<string, string>
+  onPriceChange: (color: string, size: string, value: string) => void
   courierFee: string
   onCourierFeeChange: (value: string) => void
 }
@@ -26,12 +26,13 @@ function VariantMatrix({
   onQuantityChange,
   skuFor,
   onRemoveColor,
-  pricesBySize,
+  pricesByVariant,
   onPriceChange,
   courierFee,
   onCourierFeeChange,
 }: VariantMatrixProps) {
   const [fillValues, setFillValues] = useState<Record<string, string>>({})
+  const [fillPrices, setFillPrices] = useState<Record<string, string>>({})
 
   const toggleSize = (size: string) => {
     onSizesChange(sizes.includes(size) ? sizes.filter((s) => s !== size) : [...sizes, size])
@@ -40,6 +41,11 @@ function VariantMatrix({
   const handleFillRow = (color: string) => {
     const value = Math.max(0, Number(fillValues[color]) || 0)
     sizes.forEach((size) => onQuantityChange(color, size, value))
+  }
+
+  const handleFillPriceRow = (color: string) => {
+    const value = Math.max(0, Number(fillPrices[color]) || 0).toFixed(2)
+    sizes.forEach((size) => onPriceChange(color, size, value))
   }
 
   const { totalItems, variantCount } = useMemo(() => {
@@ -118,27 +124,9 @@ function VariantMatrix({
                       {size}
                     </th>
                   ))}
-                  <th className="border-b border-slate-200 px-2 py-2 dark:border-slate-800" />
-                </tr>
-                <tr className="bg-slate-50/60 dark:bg-slate-950/60">
-                  <td className="border-b border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-800">
-                    Price/pc
-                  </td>
-                  {sizes.map((size) => (
-                    <td
-                      key={size}
-                      className="w-24 border-b border-slate-200 px-2 py-1.5 text-center dark:border-slate-800"
-                    >
-                      <PriceInput
-                        id={`vm-price-${size}`}
-                        value={pricesBySize[size] ?? ''}
-                        onChange={(value) => onPriceChange(size, value)}
-                        ariaLabel={`Price per piece for size ${size}`}
-                        dense
-                      />
-                    </td>
-                  ))}
-                  <td className="border-b border-slate-200 dark:border-slate-800" />
+                  <th className="w-36 border-b border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-500 dark:border-slate-800">
+                    Quick Fill
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -164,48 +152,79 @@ function VariantMatrix({
                       const qty = quantities[key] ?? 0
                       return (
                         <td key={size} className="w-24 px-2 py-2 text-center">
-                          <input
-                            type="number"
-                            min={0}
-                            value={qty || ''}
-                            onChange={(event) =>
-                              onQuantityChange(
-                                color,
-                                size,
-                                Math.max(0, Number(event.target.value) || 0),
-                              )
-                            }
-                            placeholder="0"
-                            title={skuFor(color, size)}
-                            className={`w-16 rounded-md border px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 ${
-                              qty > 0
-                                ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200'
-                                : 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200'
-                            }`}
-                          />
+                          <div className="flex flex-col items-center gap-1">
+                            <PriceInput
+                              id={`vm-price-${key}`}
+                              value={pricesByVariant[key] ?? ''}
+                              onChange={(value) => onPriceChange(color, size, value)}
+                              ariaLabel={`Price per piece for ${color} ${size}`}
+                              dense
+                              className="w-16"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              value={qty || ''}
+                              onChange={(event) =>
+                                onQuantityChange(
+                                  color,
+                                  size,
+                                  Math.max(0, Number(event.target.value) || 0),
+                                )
+                              }
+                              placeholder="0"
+                              title={skuFor(color, size)}
+                              className={`w-16 rounded-md border px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 ${
+                                qty > 0
+                                  ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200'
+                                  : 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200'
+                              }`}
+                            />
+                          </div>
                         </td>
                       )
                     })}
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          value={fillValues[color] ?? ''}
-                          onChange={(event) =>
-                            setFillValues((prev) => ({ ...prev, [color]: event.target.value }))
-                          }
-                          placeholder="N"
-                          aria-label={`Fill quantity for ${color}`}
-                          className="w-12 rounded-md border border-slate-200 px-1.5 py-1.5 text-center text-xs outline-none focus:border-sky-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFillRow(color)}
-                          className="whitespace-nowrap rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                        >
-                          Fill Row
-                        </button>
+                    <td className="w-36 px-2 py-2">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
+                          <PriceInput
+                            id={`vm-fillprice-${color}`}
+                            value={fillPrices[color] ?? ''}
+                            onChange={(value) =>
+                              setFillPrices((prev) => ({ ...prev, [color]: value }))
+                            }
+                            ariaLabel={`Fill price for ${color}`}
+                            dense
+                            className="w-16"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFillPriceRow(color)}
+                            className="whitespace-nowrap rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            Fill
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            min={0}
+                            value={fillValues[color] ?? ''}
+                            onChange={(event) =>
+                              setFillValues((prev) => ({ ...prev, [color]: event.target.value }))
+                            }
+                            placeholder="N"
+                            aria-label={`Fill quantity for ${color}`}
+                            className="w-16 rounded-md border border-slate-200 px-1.5 py-1.5 text-center text-xs outline-none focus:border-sky-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFillRow(color)}
+                            className="whitespace-nowrap rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            Fill
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>

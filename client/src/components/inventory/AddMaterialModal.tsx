@@ -46,9 +46,8 @@ function AddMaterialModal({ onClose, onSuccess }: AddMaterialModalProps) {
   const [colors, setColors] = useState<string[]>([])
   const [sizes, setSizes] = useState<string[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  // Keyed by size, not color+size — different sizes commonly cost different
-  // amounts (e.g. 2XL upcharges), but color doesn't affect price.
-  const [pricesBySize, setPricesBySize] = useState<Record<string, string>>({})
+  // Keyed by cellKey(color, size) — each colorway/size combo can have its own price.
+  const [pricesByVariant, setPricesByVariant] = useState<Record<string, string>>({})
   // Courier fee is for the whole restock order, so it stays a single value
   // applied to every variant created from this batch.
   const [apparelCourierFee, setApparelCourierFee] = useState('')
@@ -75,13 +74,18 @@ function AddMaterialModal({ onClose, onSuccess }: AddMaterialModalProps) {
     setQuantities((prev) => ({ ...prev, [cellKey(color, size)]: value }))
   }
 
-  const handlePriceChange = (size: string, value: string) => {
-    setPricesBySize((prev) => ({ ...prev, [size]: value }))
+  const handlePriceChange = (color: string, size: string, value: string) => {
+    setPricesByVariant((prev) => ({ ...prev, [cellKey(color, size)]: value }))
   }
 
   const handleRemoveColor = (color: string) => {
     setColors((prev) => prev.filter((c) => c !== color))
     setQuantities((prev) => {
+      const next = { ...prev }
+      for (const size of sizes) delete next[cellKey(color, size)]
+      return next
+    })
+    setPricesByVariant((prev) => {
       const next = { ...prev }
       for (const size of sizes) delete next[cellKey(color, size)]
       return next
@@ -151,8 +155,8 @@ function AddMaterialModal({ onClose, onSuccess }: AddMaterialModalProps) {
             color: variant.color,
             size: variant.size,
             unit: 'pieces',
-            pricePerUnit: pricesBySize[variant.size]?.trim()
-              ? Number(pricesBySize[variant.size])
+            pricePerUnit: pricesByVariant[cellKey(variant.color, variant.size)]?.trim()
+              ? Number(pricesByVariant[cellKey(variant.color, variant.size)])
               : undefined,
             courierFee: apparelCourierFee.trim() ? Number(apparelCourierFee) : undefined,
             imageUrl,
@@ -441,7 +445,7 @@ function AddMaterialModal({ onClose, onSuccess }: AddMaterialModalProps) {
                   onQuantityChange={handleQuantityChange}
                   skuFor={skuFor}
                   onRemoveColor={handleRemoveColor}
-                  pricesBySize={pricesBySize}
+                  pricesByVariant={pricesByVariant}
                   onPriceChange={handlePriceChange}
                   courierFee={apparelCourierFee}
                   onCourierFeeChange={setApparelCourierFee}
