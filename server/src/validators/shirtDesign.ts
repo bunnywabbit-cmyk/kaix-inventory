@@ -12,6 +12,8 @@ const colorwaySchema = z.object({
   // Sheet size for DTF designs — unique per colorway, the same way a
   // silkscreen colorway links to its own screen.
   dtfPrintSize: z.nativeEnum(DtfPrintSize).nullable().optional(),
+  // How many physical screens this colorway needs (silkscreen only).
+  screensNeeded: z.number().int().positive().default(1),
 });
 
 // Kept separate (and undefaulted) for the same reason as rawMaterial.ts's
@@ -40,5 +42,8 @@ export const updateShirtDesignSchema = z
   .object({
     ...sharedFields,
     availableFits: availableFitsSchema,
+    // Toggled from the Designs page's Unlist/Relist action — not part of the
+    // main edit form.
+    active: z.boolean(),
   })
   .partial();

@@ -2,12 +2,15 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { BadRequestError, ConflictError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
+import { invalidateCacheKey, invalidateCachePattern } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
   createPrintRunSchema,
   updatePrintRunItemSchema,
   updatePrintRunSchema,
 } from "../validators/printRun.js";
+import { LIST_CACHE_PREFIX as RAW_MATERIALS_LIST_CACHE_PREFIX } from "./rawMaterials.js";
+import { SHIRT_DESIGNS_LIST_CACHE_KEY } from "./shirtDesigns.js";
 
 export const printRunsRouter = Router();
 
@@ -119,7 +122,11 @@ printRunsRouter.post(
     const printRun = await prisma.$transaction(async (tx) => {
       const run = await tx.printRun.findUniqueOrThrow({
         where: { id },
-        include: { items: { include: { sizes: true } } },
+        include: {
+          items: {
+            include: { sizes: true, design: { select: { printType: true } }, colorway: true },
+          },
+        },
       });
 
       if (run.status === "FINISHED") {
@@ -131,7 +138,10 @@ printRunsRouter.post(
       // each design line is matched against the one blank that fits all three
       // before deducting.
       for (const item of run.items) {
+        let totalPieces = 0;
         for (const sizeLine of item.sizes) {
+          totalPieces += sizeLine.quantity;
+
           const rawMaterial = await tx.rawMaterial.findFirst({
             where: {
               name: { contains: item.garmentStyle, mode: "insensitive" },
@@ -156,6 +166,26 @@ printRunsRouter.post(
             data: { quantity: { decrement: sizeLine.quantity } },
           });
         }
+
+        // DTF lines also draw down on-hand printed-transfer-sheet stock,
+        // tracked per colorway rather than per size — one printed sheet
+        // covers the whole run of that colorway regardless of garment size.
+        if (item.design.printType === "DTF") {
+          if (!item.colorway) {
+            throw new BadRequestError(
+              `${item.garmentStyle} / ${item.color} is a DTF design line with no colorway set — can't deduct DTF print stock.`,
+            );
+          }
+          if (item.colorway.dtfStockQuantity < totalPieces) {
+            throw new BadRequestError(
+              `Not enough DTF print stock for "${item.colorway.colorwayName}" — need ${totalPieces}, have ${item.colorway.dtfStockQuantity}.`,
+            );
+          }
+          await tx.designColorway.update({
+            where: { id: item.colorway.id },
+            data: { dtfStockQuantity: { decrement: totalPieces } },
+          });
+        }
       }
 
       return tx.printRun.update({
@@ -165,6 +195,11 @@ printRunsRouter.post(
       });
     }, TRANSACTION_OPTIONS);
 
+    // Finishing deducts RawMaterial.quantity for every item, and
+    // DesignColorway.dtfStockQuantity for DTF items — both cached
+    // separately from this route's own PrintRun data.
+    invalidateCachePattern(RAW_MATERIALS_LIST_CACHE_PREFIX);
+    invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
     res.json(printRun);
   }),
 );

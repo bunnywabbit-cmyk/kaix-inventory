@@ -1,4 +1,4 @@
-import { Frame, ImageOff, Pencil, Plus, Send, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Frame, ImageOff, Pencil, Plus, Send } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
@@ -8,7 +8,6 @@ import { formatScreenNumber } from '../../lib/screenNumber'
 import { screenStatusLabels, screenStatusStyles } from '../../lib/screenStatus'
 import type { ShirtDesign } from '../../types/api'
 import AsyncState from '../ui/AsyncState'
-import ConfirmDialog from '../ui/ConfirmDialog'
 import Toast from '../ui/Toast'
 import DesignFormModal from './DesignFormModal'
 
@@ -16,21 +15,34 @@ interface DesignsProps {
   searchQuery: string
 }
 
+// Keeps a full design catalog from turning into one long scroll once a shop
+// has entered all of its existing designs.
+const DESIGNS_PAGE_SIZE = 10
+
 function Designs({ searchQuery }: DesignsProps) {
-  const { data: designs, loading, error, refetch } = useShirtDesigns()
+  const { data: designs, loading, error, refetch, mutate } = useShirtDesigns()
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editingDesign, setEditingDesign] = useState<ShirtDesign | null>(null)
-  const [pendingDeleteDesign, setPendingDeleteDesign] = useState<ShirtDesign | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
 
   const filtered = useMemo(() => {
     if (!designs) return []
     if (!query) return designs
     return designs.filter((design) => design.designName.toLowerCase().includes(query))
   }, [designs, query])
+
+  // Clamp rather than reset on every change — deleting a design or filtering
+  // down below the current page settles on the new last page instead of
+  // silently snapping back to page 1.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DESIGNS_PAGE_SIZE))
+  const clampedPage = Math.min(page, totalPages - 1)
+  const pagedDesigns = filtered.slice(
+    clampedPage * DESIGNS_PAGE_SIZE,
+    clampedPage * DESIGNS_PAGE_SIZE + DESIGNS_PAGE_SIZE,
+  )
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -44,18 +56,19 @@ function Designs({ searchQuery }: DesignsProps) {
     showToast(message)
   }
 
-  const handleConfirmDelete = async () => {
-    if (!pendingDeleteDesign) return
-    setDeleting(true)
+  const setActive = (id: string, active: boolean) => {
+    mutate((prev) => (prev ? prev.map((d) => (d.id === id ? { ...d, active } : d)) : prev))
+  }
+
+  const handleToggleActive = async (design: ShirtDesign) => {
+    const nextActive = !design.active
+    setActive(design.id, nextActive)
     try {
-      await api.del(`/shirt-designs/${pendingDeleteDesign.id}`)
-      refetch()
-      showToast(`Deleted ${pendingDeleteDesign.designName}.`)
-      setPendingDeleteDesign(null)
+      await api.patch(`/shirt-designs/${design.id}`, { active: nextActive })
+      showToast(nextActive ? `Relisted ${design.designName}.` : `Unlisted ${design.designName}.`)
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not delete. Please try again.')
-    } finally {
-      setDeleting(false)
+      setActive(design.id, design.active)
+      showToast(err instanceof Error ? err.message : 'Could not update. Please try again.')
     }
   }
 
@@ -84,16 +97,20 @@ function Designs({ searchQuery }: DesignsProps) {
 
       {!loading && !error && (
         <div className="space-y-3">
-          {filtered.map((design) => (
+          {pagedDesigns.map((design) => (
             <div
               key={design.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60"
+              className={`flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors dark:border-slate-800 dark:bg-slate-900/60 ${
+                design.active ? '' : 'bg-slate-50/60 dark:bg-slate-950/40'
+              }`}
             >
               {design.mainProductImage ? (
                 <img
                   src={design.mainProductImage}
                   alt={design.designName}
-                  className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
+                  className={`size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
+                    design.active ? '' : 'opacity-50'
+                  }`}
                 />
               ) : (
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
@@ -101,7 +118,7 @@ function Designs({ searchQuery }: DesignsProps) {
                 </div>
               )}
 
-              <div className="min-w-0 flex-1">
+              <div className={`min-w-0 flex-1 ${design.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-2">
                   <p className="min-w-0 truncate font-medium text-slate-900 dark:text-slate-100">
                     {design.designName}
@@ -111,6 +128,11 @@ function Designs({ searchQuery }: DesignsProps) {
                   >
                     {printTypeLabels[design.printType]}
                   </span>
+                  {!design.active && (
+                    <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                      Unlisted
+                    </span>
+                  )}
                 </div>
                 {design.availableFits.length > 0 && (
                   <p className="truncate text-xs text-slate-500">
@@ -129,18 +151,27 @@ function Designs({ searchQuery }: DesignsProps) {
                       {design.colorways.map((colorway) => (
                         <div key={colorway.id} className="flex flex-wrap items-center gap-1.5">
                           <span className="text-xs text-slate-500">{colorway.colorwayName}</span>
-                          {colorway.screens.length === 0 ? (
-                            <span className="text-xs text-slate-400">No screen</span>
-                          ) : (
-                            colorway.screens.map((screen) => (
-                              <span
-                                key={screen.id}
-                                title={screenStatusLabels[screen.status]}
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${screenStatusStyles[screen.status]}`}
-                              >
-                                {formatScreenNumber(screen.screenNumber)}
-                              </span>
-                            ))
+                          {colorway.screens.map((screen) => (
+                            <span
+                              key={screen.id}
+                              title={screenStatusLabels[screen.status]}
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${screenStatusStyles[screen.status]}`}
+                            >
+                              {formatScreenNumber(screen.screenNumber)}
+                            </span>
+                          ))}
+                          {colorway.screens.length < colorway.screensNeeded && (
+                            <span
+                              className={`text-xs ${
+                                colorway.screens.length === 0
+                                  ? 'text-slate-400'
+                                  : 'text-amber-600 dark:text-amber-400'
+                              }`}
+                            >
+                              {colorway.screens.length === 0
+                                ? 'Unassigned'
+                                : `${colorway.screens.length}/${colorway.screensNeeded} screens`}
+                            </span>
                           )}
                         </div>
                       ))}
@@ -184,11 +215,15 @@ function Designs({ searchQuery }: DesignsProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPendingDeleteDesign(design)}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  onClick={() => handleToggleActive(design)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                    design.active
+                      ? 'border-slate-200 text-slate-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                      : 'border-emerald-400 bg-emerald-500 text-white hover:bg-emerald-600'
+                  }`}
                 >
-                  <Trash2 className="size-3.5" />
-                  Delete
+                  {design.active ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  {design.active ? 'Unlist' : 'Relist'}
                 </button>
               </div>
             </div>
@@ -197,6 +232,31 @@ function Designs({ searchQuery }: DesignsProps) {
             <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500 dark:border-slate-800">
               {searchQuery ? `No designs match "${searchQuery}".` : 'No designs yet.'}
             </p>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(0, prev - 1))}
+                disabled={clampedPage === 0}
+                className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-transparent dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <ChevronLeft className="size-3.5" />
+                Prev
+              </button>
+              <span className="text-xs text-slate-500">
+                Page {clampedPage + 1} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.min(totalPages - 1, prev + 1))}
+                disabled={clampedPage === totalPages - 1}
+                className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-transparent dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Next
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -210,18 +270,6 @@ function Designs({ searchQuery }: DesignsProps) {
           design={editingDesign}
           onClose={() => setEditingDesign(null)}
           onSuccess={handleFormSuccess}
-        />
-      )}
-
-      {pendingDeleteDesign && (
-        <ConfirmDialog
-          title={`Delete "${pendingDeleteDesign.designName}"?`}
-          message="This cannot be undone."
-          confirmLabel="Delete"
-          tone="danger"
-          confirming={deleting}
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setPendingDeleteDesign(null)}
         />
       )}
 

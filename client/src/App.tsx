@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import ProtectedRoute from './components/auth/ProtectedRoute'
-import AIChatDrawer from './components/dashboard/AIChatDrawer'
+// AIChatDrawer temporarily disabled — not being used for now. Re-enable by
+// restoring this import and the <AIChatDrawer /> line below.
+// import AIChatDrawer from './components/dashboard/AIChatDrawer'
 import DashboardHome from './components/dashboard/DashboardHome'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -77,7 +79,7 @@ function AppShell() {
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{renderView()}</main>
       </div>
 
-      <AIChatDrawer />
+      {/* <AIChatDrawer /> */}
     </div>
   )
 }

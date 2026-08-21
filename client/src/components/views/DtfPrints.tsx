@@ -1,6 +1,6 @@
-import { CheckCircle2, Circle, ImageOff, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, Circle, ImageOff, Layers, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useDtfPrintOrders } from '../../hooks/useInventory'
+import { useDtfPrintOrders, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import type { DtfPrintOrder } from '../../types/api'
@@ -8,6 +8,7 @@ import AsyncState from '../ui/AsyncState'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import Toast from '../ui/Toast'
 import DtfPrintOrderFormModal from './DtfPrintOrderFormModal'
+import DtfStockFormModal from './DtfStockFormModal'
 
 interface DtfPrintsProps {
   searchQuery: string
@@ -15,17 +16,48 @@ interface DtfPrintsProps {
 
 function DtfPrints({ searchQuery }: DtfPrintsProps) {
   const { data: orders, loading, error, refetch, mutate } = useDtfPrintOrders()
+  const { data: designs, refetch: refetchDesigns } = useShirtDesigns()
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<DtfPrintOrder | null>(null)
   const [pendingDeleteOrder, setPendingDeleteOrder] = useState<DtfPrintOrder | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [addStockModalOpen, setAddStockModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // On-hand printed transfer sheets, ready to press — distinct from the
+  // "still owed to the print partner" order list below. Lives on the
+  // colorway itself (dtfStockQuantity), same as a print run's stock reads.
+  const stockRows = useMemo(() => {
+    if (!designs) return []
+    return designs
+      .filter((design) => design.printType === 'DTF')
+      .flatMap((design) =>
+        design.colorways
+          .filter((colorway) => colorway.dtfStockQuantity > 0)
+          .map((colorway) => ({ design, colorway })),
+      )
+  }, [designs])
+
+  const filteredStockRows = useMemo(() => {
+    if (!query) return stockRows
+    return stockRows.filter(
+      (row) =>
+        row.design.designName.toLowerCase().includes(query) ||
+        row.colorway.colorwayName.toLowerCase().includes(query),
+    )
+  }, [stockRows, query])
 
   const showToast = (message: string) => {
     setToastMessage(message)
     window.setTimeout(() => setToastMessage(null), 3200)
+  }
+
+  const handleStockFormSuccess = (message: string) => {
+    setAddStockModalOpen(false)
+    refetchDesigns()
+    showToast(message)
   }
 
   const filtered = useMemo(() => {
@@ -76,32 +108,99 @@ function DtfPrints({ searchQuery }: DtfPrintsProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">DTF Prints</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Print files still owed to the outsourced DTF partner &mdash; mark each one Ordered
-            once you've sent it over.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAddModalOpen(true)}
-          className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-        >
-          <Plus className="size-4" />
-          Add to Order List
-        </button>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">DTF Prints</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Printed transfer sheets on hand, and print files still owed to the outsourced partner.
+        </p>
       </div>
 
-      {(loading || error) && (
-        <AsyncState loading={loading} error={error} loadingLabel="Loading DTF orders..." />
-      )}
+      <div className="space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">On-Hand Stock</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Already-printed sheets ready to press. Finishing a print run deducts from this.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAddStockModalOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          >
+            <Plus className="size-4" />
+            Add Stock
+          </button>
+        </div>
 
-      {!loading && !error && (
-        <div className="space-y-3">
-          {filtered.map((order) => (
+        <div className="space-y-2">
+          {filteredStockRows.map(({ design, colorway }) => (
+            <div
+              key={colorway.id}
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60"
+            >
+              {colorway.imageUrl ? (
+                <img
+                  src={colorway.imageUrl}
+                  alt={design.designName}
+                  className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
+                />
+              ) : (
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                  <Layers className="size-4" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-slate-900 dark:text-slate-100">
+                  {design.designName}
+                </p>
+                <p className="truncate text-xs text-slate-500">{colorway.colorwayName}</p>
+              </div>
+              {colorway.dtfPrintSize && (
+                <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-400">
+                  {dtfPrintSizeLabels[colorway.dtfPrintSize]}
+                </span>
+              )}
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 tabular-nums dark:bg-emerald-500/10 dark:text-emerald-400">
+                {colorway.dtfStockQuantity} on hand
+              </span>
+            </div>
+          ))}
+          {filteredStockRows.length === 0 && (
+            <p className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-slate-800">
+              {query ? `No stock matches "${searchQuery}".` : 'No DTF stock on hand yet.'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">To Order</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Print files still owed to the outsourced DTF partner &mdash; mark each one Ordered
+              once you've sent it over.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAddModalOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          >
+            <Plus className="size-4" />
+            Add to Order List
+          </button>
+        </div>
+
+        {(loading || error) && (
+          <AsyncState loading={loading} error={error} loadingLabel="Loading DTF orders..." />
+        )}
+
+        {!loading && !error && (
+          <div className="space-y-3">
+            {filtered.map((order) => (
             <div
               key={order.id}
               className={`flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors dark:border-slate-800 dark:bg-slate-900/60 ${
@@ -183,6 +282,11 @@ function DtfPrints({ searchQuery }: DtfPrintsProps) {
             </p>
           )}
         </div>
+        )}
+      </div>
+
+      {addStockModalOpen && (
+        <DtfStockFormModal onClose={() => setAddStockModalOpen(false)} onSuccess={handleStockFormSuccess} />
       )}
 
       {addModalOpen && (

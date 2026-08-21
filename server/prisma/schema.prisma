@@ -95,6 +95,12 @@ model ShirtDesign {
   // Default sale price per piece for this design — pre-fills FinishedGood's
   // unitPrice when new stock is added, but each variant can still override it.
   price            Float?
+  // Soft-delete flag. Designs with print run history can't be hard-deleted
+  // (that history is a production log — deleting the design would either
+  // cascade-destroy it or hit a blocked FK), so "Delete" on the Designs page
+  // unlists instead: hidden from pickers for new production/screens, but its
+  // existing colorways, screens, finished goods, and sales stay intact.
+  active           Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -114,6 +120,17 @@ model DesignColorway {
   // silkscreen colorway links to its own screen. Set on the Designs page,
   // not per order.
   dtfPrintSize DtfPrintSize?
+  // How many physical screens this colorway needs (silkscreen only — a
+  // multi-color ink separation needs one screen per color). Set on the
+  // Designs page; Screen Rack uses it to show how many of that target are
+  // actually linked yet. Meaningless for DTF colorways, left at the default.
+  screensNeeded Int @default(1)
+  // On-hand count of already-printed DTF transfer sheets for this colorway,
+  // ready to press (DTF only) — distinct from DtfPrintOrder, which tracks
+  // sheets still owed by the outsourced print partner, not yet in hand.
+  // Finishing a print run for this colorway decrements it. Meaningless for
+  // silkscreen colorways, left at the default.
+  dtfStockQuantity Int @default(0)
 
   shirtDesignId String
   shirtDesign   ShirtDesign @relation(fields: [shirtDesignId], references: [id], onDelete: Cascade)

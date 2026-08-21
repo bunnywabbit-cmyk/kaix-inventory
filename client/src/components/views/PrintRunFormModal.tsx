@@ -53,6 +53,10 @@ function makeItemKey() {
 function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalProps) {
   const isEdit = Boolean(printRun)
   const { data: designs } = useShirtDesigns()
+  // Unlisted designs stay fully intact in already-added run items (those
+  // carry their own design/colorway info inline, independent of this list)
+  // but shouldn't be offered when adding a new line to the run.
+  const pickableDesigns = useMemo(() => (designs ?? []).filter((d) => d.active), [designs])
 
   const [items, setItems] = useState<ItemDraft[]>(
     () =>
@@ -102,7 +106,10 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
     return () => window.clearTimeout(resetTimeoutRef.current)
   }, [])
 
-  const design = useMemo(() => designs?.find((d) => d.id === designId) ?? null, [designs, designId])
+  const design = useMemo(
+    () => pickableDesigns.find((d) => d.id === designId) ?? null,
+    [pickableDesigns, designId],
+  )
 
   const resetStaging = () => {
     setDesignId('')
@@ -115,7 +122,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
   }
 
   const handleDesignChange = (id: string) => {
-    const nextDesign = designs?.find((d) => d.id === id) ?? null
+    const nextDesign = pickableDesigns.find((d) => d.id === id) ?? null
     window.clearTimeout(resetTimeoutRef.current)
     setDesignId(id)
     // Skip the extra click when there's only one possible answer anyway.
@@ -360,7 +367,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                     attemptedItem && !design ? 'p-1 ring-1 ring-red-500' : ''
                   }`}
                 >
-                  <DesignSelect designs={designs ?? []} value={designId} onChange={handleDesignChange} />
+                  <DesignSelect designs={pickableDesigns} value={designId} onChange={handleDesignChange} />
                 </div>
               )}
             </div>

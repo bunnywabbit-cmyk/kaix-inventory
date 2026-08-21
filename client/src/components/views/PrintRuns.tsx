@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronDown, Circle, ImageOff, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { usePrintRuns } from '../../hooks/useInventory'
+import { usePrintRuns, useRawMaterials, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { printRunStatusLabels, printRunStatusStyles } from '../../lib/printRunStatus'
 import { sortSizes } from '../../lib/variantMatrix'
@@ -20,6 +20,13 @@ const actionButtonClass =
 
 function PrintRuns({ searchQuery }: PrintRunsProps) {
   const { data: printRuns, loading, error, refetch, mutate } = usePrintRuns()
+  // Finishing a run deducts blank-shirt raw materials and (for DTF designs)
+  // on-hand DTF stock, but those live in separately-cached resources — this
+  // component only ever fetches print runs itself, so without refetching
+  // these two explicitly, Raw Materials and DTF Prints would keep showing
+  // pre-deduction numbers until their own 2-minute staleTime lapses.
+  const { refetch: refetchRawMaterials } = useRawMaterials()
+  const { refetch: refetchDesigns } = useShirtDesigns()
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -108,7 +115,9 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
     try {
       await api.post(`/print-runs/${pendingFinishRun.id}/finish`)
       refetch()
-      showToast('Finished print run — blanks deducted from Raw Materials.')
+      refetchRawMaterials()
+      refetchDesigns()
+      showToast('Finished print run — blanks and DTF stock deducted.')
       setPendingFinishRun(null)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not finish. Please try again.')
@@ -329,7 +338,7 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
       {pendingFinishRun && (
         <ConfirmDialog
           title="Finish this print run?"
-          message="This deducts the printed quantities from the matching blanks in Raw Materials for every design in this run and locks it as complete. This cannot be undone."
+          message="This deducts the printed quantities from the matching blanks in Raw Materials for every design in this run — and, for DTF designs, from their on-hand print stock too — then locks it as complete. This cannot be undone."
           confirmLabel="Finish Print Run"
           confirming={finishing}
           onConfirm={handleConfirmFinish}

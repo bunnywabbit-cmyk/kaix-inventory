@@ -18,7 +18,9 @@ export const rawMaterialsRouter = Router();
 
 // Keyed per categoryId filter (including "no filter") so each variant of the
 // list gets its own cached entry; invalidation clears the whole family at once.
-const LIST_CACHE_PREFIX = "raw-materials:list";
+// Exported so other routes that mutate RawMaterial.quantity directly (e.g.
+// printRuns.ts's finish route) can invalidate it too.
+export const LIST_CACHE_PREFIX = "raw-materials:list";
 const LIST_CACHE_TTL_SECONDS = 60;
 
 rawMaterialsRouter.get(

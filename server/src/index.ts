@@ -4,11 +4,13 @@ import cors from "cors";
 import "dotenv/config";
 import express from "express";
 import { errorHandler } from "./lib/errorHandler.js";
+import { prisma } from "./lib/prisma.js";
 import { requireAuth } from "./middleware/authMiddleware.js";
 import { aiRouter } from "./routes/ai.js";
 import { authRouter } from "./routes/auth.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { dtfPrintOrdersRouter } from "./routes/dtfPrintOrders.js";
+import { dtfPrintStockRouter } from "./routes/dtfPrintStock.js";
 import { finishedGoodsRouter } from "./routes/finishedGoods.js";
 import { printRunsRouter } from "./routes/printRuns.js";
 import { rawMaterialsRouter } from "./routes/rawMaterials.js";
@@ -38,7 +40,13 @@ app.use(
   }),
 );
 
-app.get("/api/health", (_req, res) => {
+// Touches the DB, not just the web process — both Render's free web service
+// and Neon's compute scale to zero after inactivity, and either one waking
+// from cold is what causes the multi-second lag on the first request after
+// a while. A scheduled ping here (see .github/workflows/keep-warm.yml) keeps
+// both warm for free instead of paying for always-on compute.
+app.get("/api/health", async (_req, res) => {
+  await prisma.category.count();
   res.json({ status: "ok", service: "kaix-inventory-server" });
 });
 
@@ -52,6 +60,7 @@ app.use("/api/screens", requireAuth, screensRouter);
 app.use("/api/finished-goods", requireAuth, finishedGoodsRouter);
 app.use("/api/print-runs", requireAuth, printRunsRouter);
 app.use("/api/dtf-print-orders", requireAuth, dtfPrintOrdersRouter);
+app.use("/api/dtf-print-stock", requireAuth, dtfPrintStockRouter);
 app.use("/api/uploads", requireAuth, uploadsRouter);
 app.use("/api/ai", requireAuth, aiRouter);
 

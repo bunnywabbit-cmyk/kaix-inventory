@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { ConflictError } from "../lib/httpError.js";
 import { prisma } from "../lib/prisma.js";
 import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import { createScreenSchema, updateScreenSchema } from "../validators/screen.js";
+import { SHIRT_DESIGNS_LIST_CACHE_KEY } from "./shirtDesigns.js";
 
 export const screensRouter = Router();
 
@@ -14,25 +14,6 @@ const LIST_CACHE_KEY = "screens:list";
 // Screens change status far less often than stock does, so this can sit
 // longer — 5 minutes, matching the spec.
 const LIST_CACHE_TTL_SECONDS = 5 * 60;
-
-// A colorway belongs to at most one screen at a time (a screen can still hold several
-// colorways). Re-checked here so a stale client or a race can't silently steal a
-// colorway that's already claimed by a different screen.
-async function assertColorwaysAvailable(colorwayIds: string[], excludeScreenId?: string) {
-  if (colorwayIds.length === 0) return;
-  const colorways = await prisma.designColorway.findMany({
-    where: { id: { in: colorwayIds } },
-    include: { screens: { select: { id: true, screenNumber: true } } },
-  });
-  for (const colorway of colorways) {
-    const conflict = colorway.screens.find((screen) => screen.id !== excludeScreenId);
-    if (conflict) {
-      throw new ConflictError(
-        `"${colorway.colorwayName}" is already linked to ${conflict.screenNumber}.`,
-      );
-    }
-  }
-}
 
 screensRouter.get(
   "/",
@@ -63,7 +44,6 @@ screensRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const { colorwayIds, ...data } = createScreenSchema.parse(req.body);
-    await assertColorwaysAvailable(colorwayIds);
     const screen = await prisma.physicalScreen.create({
       data: {
         ...data,
@@ -72,6 +52,7 @@ screensRouter.post(
       include: colorwayInclude,
     });
     invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
     res.status(201).json(screen);
   }),
 );
@@ -81,9 +62,6 @@ screensRouter.patch(
   asyncHandler(async (req, res) => {
     const { id } = idParamSchema.parse(req.params);
     const { colorwayIds, ...data } = updateScreenSchema.parse(req.body);
-    if (colorwayIds !== undefined) {
-      await assertColorwaysAvailable(colorwayIds, id);
-    }
     const screen = await prisma.physicalScreen.update({
       where: { id },
       data: {
@@ -94,6 +72,7 @@ screensRouter.patch(
       include: colorwayInclude,
     });
     invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
     res.json(screen);
   }),
 );
@@ -104,6 +83,7 @@ screensRouter.delete(
     const { id } = idParamSchema.parse(req.params);
     await prisma.physicalScreen.delete({ where: { id } });
     invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
     res.status(204).send();
   }),
 );

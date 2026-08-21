@@ -44,6 +44,10 @@ export interface DesignColorway {
   // Sheet size for DTF designs — unique per colorway, the same way a
   // silkscreen colorway links to its own screen.
   dtfPrintSize: DtfPrintSize | null;
+  // How many physical screens this colorway needs (silkscreen only).
+  screensNeeded: number;
+  // On-hand count of already-printed DTF transfer sheets, ready to press (DTF only).
+  dtfStockQuantity: number;
   shirtDesignId: string;
 }
 
@@ -65,6 +69,10 @@ export interface ShirtDesign {
   mainProductImage: string;
   availableFits: string[];
   price: number | null;
+  // Soft-delete flag — unlisted designs keep all their history (colorways,
+  // screens, finished goods, sales) but are hidden from pickers for new
+  // production.
+  active: boolean;
   colorways: DesignColorwayWithScreens[];
   createdAt: string;
   updatedAt: string;

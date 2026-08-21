@@ -301,11 +301,7 @@ function ColorwayPicker({ designs, selectedIds, onChange }: ColorwayPickerProps)
       {browsingDesign && (
         <div className="flex flex-wrap gap-2">
           {browsingDesign.colorways.length === 0 ? (
-            <p className="text-xs text-slate-400">
-              {browsingDesign.totalColorwayCount === 0
-                ? 'This design has no colorways yet.'
-                : "This design's colorways are already linked to other screens."}
-            </p>
+            <p className="text-xs text-slate-400">This design has no colorways yet.</p>
           ) : availableColorways.length === 0 ? (
             <p className="text-xs text-slate-400">
               All of this design's colorways have been added.

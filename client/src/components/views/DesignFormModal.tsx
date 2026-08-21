@@ -29,6 +29,10 @@ interface ColorwayDraft {
   // Sheet size for DTF designs — unique per colorway, the same way a
   // silkscreen colorway links to its own screen.
   dtfPrintSize: DtfPrintSize | null
+  // How many physical screens this colorway needs (silkscreen only) — e.g. a
+  // 2-color ink separation needs 2 screens. Screen Rack uses this as the
+  // target when showing how many are actually linked yet.
+  screensNeeded: number
 }
 
 const inputClass =
@@ -54,7 +58,7 @@ const pillClass = (active: boolean) =>
 const colorwayGridClass = (printType: PrintType) =>
   printType === 'DTF'
     ? 'grid grid-cols-[3rem_1fr_8rem_2rem] items-center gap-3'
-    : 'grid grid-cols-[3rem_1fr_2rem] items-center gap-3'
+    : 'grid grid-cols-[3rem_1fr_6rem_2rem] items-center gap-3'
 
 function makeColorwayKey() {
   return Math.random().toString(36).slice(2)
@@ -69,6 +73,7 @@ function blankColorwayDraft(): ColorwayDraft {
     imageUrl: null,
     previewSrc: null,
     dtfPrintSize: null,
+    screensNeeded: 1,
   }
 }
 
@@ -81,6 +86,7 @@ interface ColorwayRowProps {
   onRemovePhoto: () => void
   onRemoveRow: () => void
   onDtfSizeChange: (size: DtfPrintSize) => void
+  onScreensNeededChange: (count: number) => void
 }
 
 function ColorwayRow({
@@ -92,6 +98,7 @@ function ColorwayRow({
   onRemovePhoto,
   onRemoveRow,
   onDtfSizeChange,
+  onScreensNeededChange,
 }: ColorwayRowProps) {
   const inputId = useId()
 
@@ -174,6 +181,17 @@ function ColorwayRow({
         </div>
       )}
 
+      {printType === 'SILKSCREEN' && (
+        <input
+          type="number"
+          min={1}
+          value={draft.screensNeeded}
+          onChange={(event) => onScreensNeededChange(Math.max(1, Number(event.target.value) || 1))}
+          aria-label={`Screens needed for ${draft.colorwayName || 'this colorway'}`}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+        />
+      )}
+
       <button
         type="button"
         onClick={onRemoveRow}
@@ -214,6 +232,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
         imageUrl: colorway.imageUrl,
         previewSrc: colorway.imageUrl,
         dtfPrintSize: colorway.dtfPrintSize,
+        screensNeeded: colorway.screensNeeded,
       }))
     }
     // At least one colorway is required, so a new design starts with a blank
@@ -253,6 +272,10 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
     setColorways((prev) => prev.map((c) => (c.key === key ? { ...c, dtfPrintSize: size } : c)))
   }
 
+  const updateColorwayScreensNeeded = (key: string, count: number) => {
+    setColorways((prev) => prev.map((c) => (c.key === key ? { ...c, screensNeeded: count } : c)))
+  }
+
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   // Flips true on the first submit click that finds something missing — that's
@@ -264,6 +287,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
     colorwayName: string
     imageUrl: string
     dtfPrintSize: DtfPrintSize | null
+    screensNeeded: number
   }
 
   // Every colorway row on screen must be fully filled in before saving — an
@@ -296,6 +320,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
         colorwayName: draft.colorwayName.trim(),
         imageUrl,
         dtfPrintSize: printType === 'DTF' ? draft.dtfPrintSize : null,
+        screensNeeded: printType === 'SILKSCREEN' ? draft.screensNeeded : 1,
       })
     }
     return resolved
@@ -417,7 +442,8 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
 
         {printType === 'SILKSCREEN' && (
           <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
-            Assign a screen to this design from the Screen Rack page.
+            Set how many screens each colorway needs below (e.g. a 2-color ink separation needs
+            2) — then create and link the physical screens from the Screen Rack page.
           </p>
         )}
 
@@ -468,6 +494,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
                 <span>Image</span>
                 <span>Color</span>
                 {printType === 'DTF' && <span>Size</span>}
+                {printType === 'SILKSCREEN' && <span>Screens</span>}
                 <span />
               </div>
               {colorways.map((draft) => (
@@ -481,6 +508,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
                   onRemovePhoto={() => removeColorwayPhoto(draft.key)}
                   onRemoveRow={() => removeColorwayRow(draft.key)}
                   onDtfSizeChange={(size) => updateColorwayDtfSize(draft.key, size)}
+                  onScreensNeededChange={(count) => updateColorwayScreensNeeded(draft.key, count)}
                 />
               ))}
             </div>

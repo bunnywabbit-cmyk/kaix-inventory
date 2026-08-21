@@ -2,8 +2,9 @@ import { Loader2 } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
-import { screenStatusLabels } from '../../lib/screenStatus'
 import { invalidBoxClass, invalidInputClass } from '../../lib/formValidation'
+import { formatScreenNumber } from '../../lib/screenNumber'
+import { screenStatusLabels } from '../../lib/screenStatus'
 import type { PhysicalScreen, ScreenStatus } from '../../types/api'
 import ColorwayPicker, { type ColorwayPickerDesign } from '../ui/ColorwayPicker'
 import Modal from '../ui/Modal'
@@ -11,6 +12,9 @@ import Modal from '../ui/Modal'
 interface ScreenFormModalProps {
   screens: PhysicalScreen[]
   screen?: PhysicalScreen
+  /** Pre-select these colorways when creating a new screen (e.g. jumping in
+   * from a "needs screens" prompt elsewhere). Ignored when editing. */
+  initialColorwayIds?: string[]
   onClose: () => void
   onSuccess: (message: string) => void
 }
@@ -45,17 +49,23 @@ function nextScreenNumberSuffix(screens: PhysicalScreen[]): string {
   return String(max + 1).padStart(3, '0')
 }
 
-function ScreenFormModal({ screens, screen, onClose, onSuccess }: ScreenFormModalProps) {
+function ScreenFormModal({
+  screens,
+  screen,
+  initialColorwayIds,
+  onClose,
+  onSuccess,
+}: ScreenFormModalProps) {
   const isEdit = Boolean(screen)
   const { data: designs } = useShirtDesigns()
 
   // Colorways are picked by first choosing a design, then its colorways. A colorway
-  // belongs to at most one screen at a time, so once it's linked anywhere it drops out
-  // of the pool — except for the screen being edited itself (its own current picks
-  // must stay selectable). The screen's own already-linked colorways ride along on
-  // `screen` itself (from the parent's already-loaded list), so seed them in
-  // immediately — otherwise the picker briefly can't resolve their names/thumbnails
-  // until the separate designs fetch resolves.
+  // can be linked to more than one screen at once (e.g. a multi-color design needs a
+  // separate screen per ink color), so a colorway already linked elsewhere still stays
+  // pickable here. The screen's own already-linked colorways ride along on `screen`
+  // itself (from the parent's already-loaded list), so seed them in immediately —
+  // otherwise the picker briefly can't resolve their names/thumbnails until the
+  // separate designs fetch resolves.
   const designsForPicker = useMemo(() => {
     const list: ColorwayPickerDesign[] = (designs ?? [])
       .filter((design) => design.printType === 'SILKSCREEN')
@@ -64,13 +74,11 @@ function ScreenFormModal({ screens, screen, onClose, onSuccess }: ScreenFormModa
         designName: design.designName,
         mainProductImage: design.mainProductImage,
         totalColorwayCount: design.colorways.length,
-        colorways: design.colorways
-          .filter((colorway) => colorway.screens.every((s) => s.id === screen?.id))
-          .map((colorway) => ({
-            id: colorway.id,
-            colorwayName: colorway.colorwayName,
-            imageUrl: colorway.imageUrl,
-          })),
+        colorways: design.colorways.map((colorway) => ({
+          id: colorway.id,
+          colorwayName: colorway.colorwayName,
+          imageUrl: colorway.imageUrl,
+        })),
       }))
 
     for (const colorway of screen?.colorways ?? []) {
@@ -105,8 +113,45 @@ function ScreenFormModal({ screens, screen, onClose, onSuccess }: ScreenFormModa
   const [frameSize, setFrameSize] = useState(screen?.frameSize ?? DEFAULT_FRAME_SIZE)
   const [status, setStatus] = useState<ScreenStatus>(screen?.status ?? 'CLEAN_RECLAIMED')
   const [colorwayIds, setColorwayIds] = useState<string[]>(
-    () => screen?.colorways.map((c) => c.id) ?? [],
+    () => screen?.colorways.map((c) => c.id) ?? initialColorwayIds ?? [],
   )
+
+  // Most of the time a "new" screen is really an already-cut, currently-blank
+  // frame sitting in the rack, not a brand-new physical object — so creating
+  // a screen offers reusing one of those instead of always registering a
+  // fresh number. Reusing pre-fills (and locks) its real specs and, on
+  // submit, PATCHes that screen rather than POSTing a new row. Edit mode
+  // doesn't offer this — you wouldn't reassign an existing screen's identity
+  // mid-edit.
+  // "Clean" alone isn't enough — some screens carry a Clean status while
+  // still holding a colorway from before it was reclaimed, which the rest of
+  // the app already treats as still-in-use (see the "Unassigned" check in
+  // ScreenRack). Only an actually-empty clean screen is free to hand out here.
+  const cleanScreens = useMemo(
+    () =>
+      screens.filter(
+        (candidate) => candidate.status === 'CLEAN_RECLAIMED' && candidate.colorways.length === 0,
+      ),
+    [screens],
+  )
+  const [reuseScreenId, setReuseScreenId] = useState('')
+  const reusingScreen = cleanScreens.find((candidate) => candidate.id === reuseScreenId) ?? null
+
+  const handleReuseScreenChange = (id: string) => {
+    setReuseScreenId(id)
+    const target = cleanScreens.find((candidate) => candidate.id === id)
+    if (target) {
+      setScreenNumberDraft(target.screenNumber.replace(/^Screen #/, ''))
+      setMeshCount(String(target.meshCount))
+      setFrameType(target.frameType)
+      setFrameSize(target.frameSize ?? DEFAULT_FRAME_SIZE)
+    } else {
+      setScreenNumberDraft(null)
+      setMeshCount('')
+      setFrameType('')
+      setFrameSize(DEFAULT_FRAME_SIZE)
+    }
+  }
 
   // Reclaiming a screen wipes it clean — washing out the emulsion frees up
   // whatever colorway(s) it was holding for reuse elsewhere.
@@ -151,6 +196,11 @@ function ScreenFormModal({ screens, screen, onClose, onSuccess }: ScreenFormModa
       if (isEdit) {
         await api.patch(`/screens/${screen!.id}`, payload)
         onSuccess(`Updated ${payload.screenNumber}.`)
+      } else if (reusingScreen) {
+        // Only the parts that actually changed — mesh/frame specs belong to
+        // the physical object we're reusing, not this form.
+        await api.patch(`/screens/${reusingScreen.id}`, { status, colorwayIds })
+        onSuccess(`Linked ${payload.screenNumber}.`)
       } else {
         await api.post('/screens', payload)
         onSuccess(`Added ${payload.screenNumber}.`)
@@ -164,96 +214,132 @@ function ScreenFormModal({ screens, screen, onClose, onSuccess }: ScreenFormModa
   return (
     <Modal title={isEdit ? 'Edit Screen' : 'Add Screen'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {!isEdit && cleanScreens.length > 0 && (
           <div>
-            <label className={labelClass} htmlFor="screen-number">
+            <label className={labelClass} htmlFor="screen-reuse">
               Screen Number
             </label>
-            <div
-              className={`mt-1 flex items-stretch overflow-hidden rounded-lg border bg-white dark:bg-slate-950 ${
-                attempted && !screenNumberSuffix.trim()
-                  ? invalidBoxClass
-                  : 'border-slate-200 focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/30 dark:border-slate-800'
-              }`}
+            <select
+              id="screen-reuse"
+              value={reuseScreenId}
+              onChange={(event) => handleReuseScreenChange(event.target.value)}
+              className={`${inputClass} mt-1`}
             >
-              <span className="flex shrink-0 items-center border-r border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-                #
-              </span>
-              <input
-                id="screen-number"
-                type="text"
-                required
-                value={screenNumberSuffix}
-                onChange={(event) => setScreenNumberDraft(event.target.value)}
-                placeholder="106"
-                className="w-full bg-transparent px-3 py-2 text-sm text-slate-900 outline-none dark:text-slate-100"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={labelClass} htmlFor="screen-mesh">
-              Mesh Count
-            </label>
-            <input
-              id="screen-mesh"
-              type="number"
-              min={1}
-              list="screen-mesh-options"
-              required
-              value={meshCount}
-              onChange={(event) => setMeshCount(event.target.value)}
-              placeholder="e.g. 156"
-              className={attempted && !(Number(meshCount) > 0) ? inputClassInvalid : inputClass}
-            />
-            <datalist id="screen-mesh-options">
-              {MESH_COUNT_OPTIONS.map((option) => (
-                <option key={option} value={option} />
+              <option value="">+ Register a new screen</option>
+              {cleanScreens.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {formatScreenNumber(candidate.screenNumber)} — Mesh {candidate.meshCount}
+                </option>
               ))}
-            </datalist>
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              {reusingScreen
+                ? 'Reusing this clean screen — its mesh and frame specs are locked in below.'
+                : 'Or pick a clean screen already in the rack instead of registering a new one.'}
+            </p>
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className={labelClass} htmlFor="screen-frame-type">
-              Frame Type
-            </label>
-            <input
-              id="screen-frame-type"
-              type="text"
-              list="screen-frame-type-options"
-              required
-              value={frameType}
-              onChange={(event) => setFrameType(event.target.value)}
-              placeholder="e.g. Aluminum"
-              className={attempted && !frameType.trim() ? inputClassInvalid : inputClass}
-            />
-            <datalist id="screen-frame-type-options">
-              {FRAME_TYPE_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
+        {reusingScreen ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+            {formatScreenNumber(reusingScreen.screenNumber)} · Mesh {reusingScreen.meshCount} ·{' '}
+            {reusingScreen.frameType}
+            {reusingScreen.frameSize ? ` · ${reusingScreen.frameSize}` : ''}
           </div>
-          <div>
-            <label className={labelClass} htmlFor="screen-frame-size">
-              Frame Size <span className="font-normal text-slate-400">(optional)</span>
-            </label>
-            <input
-              id="screen-frame-size"
-              type="text"
-              list="screen-frame-size-options"
-              value={frameSize}
-              onChange={(event) => setFrameSize(event.target.value)}
-              placeholder="e.g. 18x24 inches"
-              className={inputClass}
-            />
-            <datalist id="screen-frame-size-options">
-              {FRAME_SIZE_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelClass} htmlFor="screen-number">
+                  Screen Number
+                </label>
+                <div
+                  className={`mt-1 flex items-stretch overflow-hidden rounded-lg border bg-white dark:bg-slate-950 ${
+                    attempted && !screenNumberSuffix.trim()
+                      ? invalidBoxClass
+                      : 'border-slate-200 focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/30 dark:border-slate-800'
+                  }`}
+                >
+                  <span className="flex shrink-0 items-center border-r border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                    #
+                  </span>
+                  <input
+                    id="screen-number"
+                    type="text"
+                    required
+                    value={screenNumberSuffix}
+                    onChange={(event) => setScreenNumberDraft(event.target.value)}
+                    placeholder="106"
+                    className="w-full bg-transparent px-3 py-2 text-sm text-slate-900 outline-none dark:text-slate-100"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="screen-mesh">
+                  Mesh Count
+                </label>
+                <input
+                  id="screen-mesh"
+                  type="number"
+                  min={1}
+                  list="screen-mesh-options"
+                  required
+                  value={meshCount}
+                  onChange={(event) => setMeshCount(event.target.value)}
+                  placeholder="e.g. 156"
+                  className={attempted && !(Number(meshCount) > 0) ? inputClassInvalid : inputClass}
+                />
+                <datalist id="screen-mesh-options">
+                  {MESH_COUNT_OPTIONS.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelClass} htmlFor="screen-frame-type">
+                  Frame Type
+                </label>
+                <input
+                  id="screen-frame-type"
+                  type="text"
+                  list="screen-frame-type-options"
+                  required
+                  value={frameType}
+                  onChange={(event) => setFrameType(event.target.value)}
+                  placeholder="e.g. Aluminum"
+                  className={attempted && !frameType.trim() ? inputClassInvalid : inputClass}
+                />
+                <datalist id="screen-frame-type-options">
+                  {FRAME_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="screen-frame-size">
+                  Frame Size <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <input
+                  id="screen-frame-size"
+                  type="text"
+                  list="screen-frame-size-options"
+                  value={frameSize}
+                  onChange={(event) => setFrameSize(event.target.value)}
+                  placeholder="e.g. 18x24 inches"
+                  className={inputClass}
+                />
+                <datalist id="screen-frame-size-options">
+                  {FRAME_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+          </>
+        )}
 
         <div>
           <label className={labelClass} htmlFor="screen-status">
