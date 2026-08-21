@@ -1,5 +1,5 @@
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import logo from '../../assets/logo.png'
+import logo from '../../assets/kaix-butterfly.png'
 import { navItems, type ViewKey } from '../../lib/navigation'
 
 interface SidebarProps {
@@ -31,14 +31,17 @@ function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-slate-200 bg-white transition-all duration-200 ease-out lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-slate-200 bg-white pt-[env(safe-area-inset-top)] transition-all duration-200 ease-out lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0 lg:pt-0 dark:border-slate-800 dark:bg-slate-950 ${
           collapsed ? 'lg:w-[76px]' : 'lg:w-64'
         } ${mobileOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0'}`}
       >
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white p-1.5 ring-1 ring-inset ring-slate-200 dark:ring-slate-700">
-              <img src={logo} alt="Kaix Customs logo" className="size-full object-contain" />
+            {/* Solid dark badge behind the mark — it's a thin white outline
+                (not a filled shape), so it needs contrast that holds
+                regardless of the app's own light/dark theme. */}
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-slate-900 p-2.5 ring-1 ring-inset ring-slate-800">
+              <img src={logo} alt="Kaix Customs" className="size-full object-contain" />
             </span>
             <span className={`flex flex-col leading-tight ${collapsed ? 'lg:hidden' : ''}`}>
               <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
