@@ -2,8 +2,9 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { BadRequestError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
+import { SALES_LIST_CACHE_PREFIX } from "../routes/sales.js";
 import { logActivity } from "../services/ActivityLogService.js";
-import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
+import { getOrSetCache, invalidateCacheKey, invalidateCachePattern } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
   adjustStockSchema,
@@ -130,6 +131,7 @@ finishedGoodsRouter.post(
     }, TRANSACTION_OPTIONS);
 
     invalidateCacheKey(LIST_CACHE_KEY);
+    if (delta < 0) invalidateCachePattern(SALES_LIST_CACHE_PREFIX);
     logActivity({
       action: "STOCK_ADJUST",
       entityType: "FinishedGood",

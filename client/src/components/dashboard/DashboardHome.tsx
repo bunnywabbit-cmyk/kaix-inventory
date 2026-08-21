@@ -16,6 +16,7 @@ import DtfOrdersPanel from './DtfOrdersPanel'
 import LowStockPanel from './LowStockPanel'
 import QuickActionsBar from './QuickActionsBar'
 import RecentActivityPanel from './RecentActivityPanel'
+import RevenueSnapshotPanel from './RevenueSnapshotPanel'
 import TopSellingDesigns from './TopSellingDesigns'
 
 interface DashboardHomeProps {
@@ -173,13 +174,14 @@ function DashboardHome({ onNavigate }: DashboardHomeProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
             <LowStockPanel
               items={lowStock}
               pendingIds={pendingIds}
               onQuickRestock={handleQuickRestock}
               onViewAll={() => onNavigate('raw-materials')}
             />
+            <RevenueSnapshotPanel onViewAll={() => onNavigate('sales')} />
             <TopSellingDesigns printRuns={printRuns ?? []} onViewAll={() => onNavigate('print-runs')} />
             <DtfOrdersPanel
               items={dtfPending}

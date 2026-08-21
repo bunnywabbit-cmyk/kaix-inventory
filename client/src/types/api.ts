@@ -150,6 +150,20 @@ export interface DtfPrintOrder {
   updatedAt: string;
 }
 
+export interface Sale {
+  id: string;
+  finishedGoodId: string | null;
+  designId: string | null;
+  designName: string;
+  garmentStyle: string;
+  color: string;
+  size: string;
+  quantity: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  createdAt: string;
+}
+
 export type ActivityAction = "CREATE" | "UPDATE" | "DELETE" | "STOCK_ADJUST";
 
 export interface ActivityLogEntry {

@@ -13,6 +13,7 @@ import DtfPrints from './components/views/DtfPrints'
 import OnHandStock from './components/views/OnHandStock'
 import PrintRuns from './components/views/PrintRuns'
 import RawMaterials from './components/views/RawMaterials'
+import SalesRevenue from './components/views/SalesRevenue'
 import ScreenRack from './components/views/ScreenRack'
 import SettingsView from './components/views/SettingsView'
 import { AuthProvider } from './context/AuthContext'
@@ -47,6 +48,8 @@ function AppShell() {
         return <DtfPrints searchQuery={searchQuery} />
       case 'on-hand-stock':
         return <OnHandStock searchQuery={searchQuery} />
+      case 'sales':
+        return <SalesRevenue searchQuery={searchQuery} />
       case 'category-manager':
         return <CategoryManager />
       case 'activity-log':
