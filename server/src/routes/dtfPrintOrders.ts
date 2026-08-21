@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { prisma } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { idParamSchema } from "../validators/common.js";
 import { createDtfPrintOrderSchema, updateDtfPrintOrderSchema } from "../validators/dtfPrintOrder.js";
 
@@ -39,6 +40,13 @@ dtfPrintOrdersRouter.post(
       data,
       include: dtfPrintOrderInclude,
     });
+    logActivity({
+      action: "CREATE",
+      entityType: "DtfPrintOrder",
+      entityId: order.id,
+      message: `Added DTF order for "${order.colorway.colorwayName}" — ${order.colorway.shirtDesign.designName} (qty ${order.quantity})`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(order);
   }),
 );
@@ -55,6 +63,16 @@ dtfPrintOrdersRouter.patch(
       data,
       include: dtfPrintOrderInclude,
     });
+    logActivity({
+      action: "UPDATE",
+      entityType: "DtfPrintOrder",
+      entityId: order.id,
+      message:
+        data.ordered === true
+          ? `Marked DTF order for "${order.colorway.colorwayName}" as ordered`
+          : `Updated DTF order for "${order.colorway.colorwayName}" — ${order.colorway.shirtDesign.designName} (qty ${order.quantity})`,
+      userId: req.user?.sub,
+    });
     res.json(order);
   }),
 );
@@ -63,7 +81,17 @@ dtfPrintOrdersRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
     const { id } = idParamSchema.parse(req.params);
-    await prisma.dtfPrintOrder.delete({ where: { id } });
+    const deleted = await prisma.dtfPrintOrder.delete({
+      where: { id },
+      include: dtfPrintOrderInclude,
+    });
+    logActivity({
+      action: "DELETE",
+      entityType: "DtfPrintOrder",
+      entityId: deleted.id,
+      message: `Deleted DTF order for "${deleted.colorway.colorwayName}" — ${deleted.colorway.shirtDesign.designName}`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );

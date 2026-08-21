@@ -3,6 +3,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { BadRequestError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
 import { deleteUploadedFile } from "../lib/uploads.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCachePattern } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
@@ -57,6 +58,13 @@ rawMaterialsRouter.post(
     const data = createRawMaterialSchema.parse(req.body);
     const rawMaterial = await prisma.rawMaterial.create({ data, include: { category: true } });
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    logActivity({
+      action: "CREATE",
+      entityType: "RawMaterial",
+      entityId: rawMaterial.id,
+      message: `Added raw material "${rawMaterial.name}" (${rawMaterial.sku})`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(rawMaterial);
   }),
 );
@@ -70,6 +78,12 @@ rawMaterialsRouter.post(
       TRANSACTION_OPTIONS,
     );
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    logActivity({
+      action: "CREATE",
+      entityType: "RawMaterial",
+      message: `Added ${created.length} raw material${created.length === 1 ? "" : "s"} in a batch`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(created);
   }),
 );
@@ -103,6 +117,16 @@ rawMaterialsRouter.post(
     }, TRANSACTION_OPTIONS);
 
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    for (const material of updated) {
+      const delta = adjustments.find((a) => a.id === material.id)!.delta;
+      logActivity({
+        action: "STOCK_ADJUST",
+        entityType: "RawMaterial",
+        entityId: material.id,
+        message: `${delta >= 0 ? "Added" : "Removed"} ${Math.abs(delta)} ${material.unit ?? "unit"}${Math.abs(delta) === 1 ? "" : "s"} of "${material.name}" (now ${material.quantity})`,
+        userId: req.user?.sub,
+      });
+    }
     res.json(updated);
   }),
 );
@@ -129,6 +153,13 @@ rawMaterialsRouter.patch(
     }
 
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    logActivity({
+      action: "UPDATE",
+      entityType: "RawMaterial",
+      entityId: rawMaterial.id,
+      message: `Updated raw material "${rawMaterial.name}" (${rawMaterial.sku})`,
+      userId: req.user?.sub,
+    });
     res.json(rawMaterial);
   }),
 );
@@ -140,6 +171,13 @@ rawMaterialsRouter.delete(
     const deleted = await prisma.rawMaterial.delete({ where: { id } });
     await deleteUploadedFileIfUnreferenced(deleted.imageUrl, id);
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    logActivity({
+      action: "DELETE",
+      entityType: "RawMaterial",
+      entityId: deleted.id,
+      message: `Deleted raw material "${deleted.name}" (${deleted.sku})`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );
@@ -165,6 +203,12 @@ rawMaterialsRouter.post(
     }
 
     invalidateCachePattern(LIST_CACHE_PREFIX);
+    logActivity({
+      action: "DELETE",
+      entityType: "RawMaterial",
+      message: `Deleted ${deleted.length} raw material${deleted.length === 1 ? "" : "s"} in a batch`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );

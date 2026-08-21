@@ -6,6 +6,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardHome from './components/dashboard/DashboardHome'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
+import ActivityLog from './components/views/ActivityLog'
 import CategoryManager from './components/views/CategoryManager'
 import Designs from './components/views/Designs'
 import DtfPrints from './components/views/DtfPrints'
@@ -48,6 +49,8 @@ function AppShell() {
         return <OnHandStock searchQuery={searchQuery} />
       case 'category-manager':
         return <CategoryManager />
+      case 'activity-log':
+        return <ActivityLog searchQuery={searchQuery} />
       case 'settings':
         return <SettingsView theme={theme} onToggleTheme={toggleTheme} />
       default:

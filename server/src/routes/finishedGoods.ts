@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { BadRequestError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
@@ -49,6 +50,13 @@ finishedGoodsRouter.post(
       include: { design: true, colorway: true },
     });
     invalidateCacheKey(LIST_CACHE_KEY);
+    logActivity({
+      action: "CREATE",
+      entityType: "FinishedGood",
+      entityId: finishedGood.id,
+      message: `Added stock line "${finishedGood.design.designName} — ${finishedGood.color} / ${finishedGood.size}"`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(finishedGood);
   }),
 );
@@ -64,6 +72,13 @@ finishedGoodsRouter.patch(
       include: { design: true, colorway: true },
     });
     invalidateCacheKey(LIST_CACHE_KEY);
+    logActivity({
+      action: "UPDATE",
+      entityType: "FinishedGood",
+      entityId: finishedGood.id,
+      message: `Updated stock line "${finishedGood.design.designName} — ${finishedGood.color} / ${finishedGood.size}"`,
+      userId: req.user?.sub,
+    });
     res.json(finishedGood);
   }),
 );
@@ -115,6 +130,13 @@ finishedGoodsRouter.post(
     }, TRANSACTION_OPTIONS);
 
     invalidateCacheKey(LIST_CACHE_KEY);
+    logActivity({
+      action: "STOCK_ADJUST",
+      entityType: "FinishedGood",
+      entityId: finishedGood.id,
+      message: `${delta >= 0 ? "Restocked" : "Sold"} ${Math.abs(delta)} × "${finishedGood.design.designName} — ${finishedGood.color} / ${finishedGood.size}" (now ${finishedGood.quantityOnHand})`,
+      userId: req.user?.sub,
+    });
     res.json(finishedGood);
   }),
 );
@@ -123,8 +145,18 @@ finishedGoodsRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
     const { id } = idParamSchema.parse(req.params);
-    await prisma.finishedGood.delete({ where: { id } });
+    const deleted = await prisma.finishedGood.delete({
+      where: { id },
+      include: { design: true },
+    });
     invalidateCacheKey(LIST_CACHE_KEY);
+    logActivity({
+      action: "DELETE",
+      entityType: "FinishedGood",
+      entityId: deleted.id,
+      message: `Deleted stock line "${deleted.design.designName} — ${deleted.color} / ${deleted.size}"`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );

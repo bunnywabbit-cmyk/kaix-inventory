@@ -37,6 +37,17 @@ enum Role {
   STAFF
 }
 
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+  // A quantity moving (raw material/finished-good/DTF stock adjustments,
+  // print-run material deductions) — distinct from UPDATE so the Activity
+  // Log can badge stock movement differently from an edit to a record's
+  // own fields.
+  STOCK_ADJUST
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -47,6 +58,35 @@ model User {
   role         Role     @default(STAFF)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  activityLogs ActivityLog[]
+}
+
+// A running audit trail of who changed what, across every resource in the
+// app — surfaced on the Activity Log page. Written by ActivityLogService
+// from each route handler, fire-and-forget (see that file for why), so this
+// is best-effort rather than a guaranteed record of every mutation.
+// `userId` is nullable/SetNull rather than blocking user deletion, the same
+// way Sale snapshots its own fields instead of hard-requiring its relations.
+model ActivityLog {
+  id         String         @id @default(uuid())
+  action     ActivityAction
+  // The model this entry is about, e.g. "RawMaterial", "PhysicalScreen" —
+  // matches the Prisma model name so it doubles as a filter key.
+  entityType String
+  entityId   String?
+  // Human-readable summary, e.g. `Added raw material "Black Cotton Tee"`.
+  // Built once at write time (using data the route handler already has)
+  // rather than reconstructed from entityType/entityId at read time.
+  message    String
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType])
 }
 
 model Category {

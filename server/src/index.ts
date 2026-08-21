@@ -6,6 +6,7 @@ import express from "express";
 import { errorHandler } from "./lib/errorHandler.js";
 import { prisma } from "./lib/prisma.js";
 import { requireAuth } from "./middleware/authMiddleware.js";
+import { activityLogRouter } from "./routes/activityLog.js";
 import { aiRouter } from "./routes/ai.js";
 import { authRouter } from "./routes/auth.js";
 import { categoriesRouter } from "./routes/categories.js";
@@ -63,6 +64,7 @@ app.use("/api/dtf-print-orders", requireAuth, dtfPrintOrdersRouter);
 app.use("/api/dtf-print-stock", requireAuth, dtfPrintStockRouter);
 app.use("/api/uploads", requireAuth, uploadsRouter);
 app.use("/api/ai", requireAuth, aiRouter);
+app.use("/api/activity-log", requireAuth, activityLogRouter);
 
 app.use(errorHandler);
 

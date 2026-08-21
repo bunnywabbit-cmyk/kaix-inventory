@@ -15,6 +15,7 @@ import StatCard from '../ui/StatCard'
 import DtfOrdersPanel from './DtfOrdersPanel'
 import LowStockPanel from './LowStockPanel'
 import QuickActionsBar from './QuickActionsBar'
+import RecentActivityPanel from './RecentActivityPanel'
 import TopSellingDesigns from './TopSellingDesigns'
 
 interface DashboardHomeProps {
@@ -172,7 +173,7 @@ function DashboardHome({ onNavigate }: DashboardHomeProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-4">
             <LowStockPanel
               items={lowStock}
               pendingIds={pendingIds}
@@ -186,6 +187,7 @@ function DashboardHome({ onNavigate }: DashboardHomeProps) {
               onQuickMarkOrdered={handleQuickMarkOrdered}
               onViewAll={() => onNavigate('dtf-prints')}
             />
+            <RecentActivityPanel onViewAll={() => onNavigate('activity-log')} />
           </div>
         </>
       )}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { prisma } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { invalidateCacheKey } from "../services/CacheService.js";
 import { addDtfStockSchema } from "../validators/dtfPrintStock.js";
 import { SHIRT_DESIGNS_LIST_CACHE_KEY } from "./shirtDesigns.js";
@@ -22,6 +23,13 @@ dtfPrintStockRouter.post(
       include: { shirtDesign: true },
     });
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "STOCK_ADJUST",
+      entityType: "DesignColorway",
+      entityId: colorway.id,
+      message: `Added ${quantity} DTF sheet${quantity === 1 ? "" : "s"} for "${colorway.colorwayName}" — ${colorway.shirtDesign.designName} (now ${colorway.dtfStockQuantity})`,
+      userId: req.user?.sub,
+    });
     res.json(colorway);
   }),
 );

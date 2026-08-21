@@ -1,6 +1,7 @@
 import {
   Boxes,
   Frame,
+  History,
   LayoutDashboard,
   Palette,
   Printer,
@@ -20,6 +21,7 @@ export type ViewKey =
   | 'dtf-prints'
   | 'on-hand-stock'
   | 'category-manager'
+  | 'activity-log'
   | 'settings'
 
 export interface NavItem {
@@ -37,6 +39,7 @@ export const navItems: NavItem[] = [
   { key: 'dtf-prints', label: 'DTF Prints', icon: Send },
   { key: 'on-hand-stock', label: 'On-Hand Stock', icon: Shirt },
   { key: 'category-manager', label: 'Category Manager', icon: Tags },
+  { key: 'activity-log', label: 'Activity Log', icon: History },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -49,5 +52,6 @@ export const viewTitles: Record<ViewKey, string> = {
   'dtf-prints': 'DTF Prints',
   'on-hand-stock': 'On-Hand Stock',
   'category-manager': 'Category Manager',
+  'activity-log': 'Activity Log',
   settings: 'Settings',
 }

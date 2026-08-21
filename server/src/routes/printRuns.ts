@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { BadRequestError, ConflictError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { invalidateCacheKey, invalidateCachePattern } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
@@ -59,6 +60,13 @@ printRunsRouter.post(
       },
       include: printRunInclude,
     });
+    logActivity({
+      action: "CREATE",
+      entityType: "PrintRun",
+      entityId: printRun.id,
+      message: `Created a print run with ${printRun.items.length} line${printRun.items.length === 1 ? "" : "s"}`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(printRun);
   }),
 );
@@ -93,6 +101,13 @@ printRunsRouter.patch(
       return tx.printRun.findUniqueOrThrow({ where: { id }, include: printRunInclude });
     }, TRANSACTION_OPTIONS);
 
+    logActivity({
+      action: "UPDATE",
+      entityType: "PrintRun",
+      entityId: printRun.id,
+      message: `Edited print run (${printRun.items.length} line${printRun.items.length === 1 ? "" : "s"})`,
+      userId: req.user?.sub,
+    });
     res.json(printRun);
   }),
 );
@@ -200,6 +215,13 @@ printRunsRouter.post(
     // separately from this route's own PrintRun data.
     invalidateCachePattern(RAW_MATERIALS_LIST_CACHE_PREFIX);
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "UPDATE",
+      entityType: "PrintRun",
+      entityId: printRun.id,
+      message: `Finished print run (${printRun.items.length} line${printRun.items.length === 1 ? "" : "s"}) — raw materials deducted`,
+      userId: req.user?.sub,
+    });
     res.json(printRun);
   }),
 );
@@ -213,6 +235,13 @@ printRunsRouter.delete(
       throw new ConflictError("Finished print runs are part of the production log and can't be deleted.");
     }
     await prisma.printRun.delete({ where: { id } });
+    logActivity({
+      action: "DELETE",
+      entityType: "PrintRun",
+      entityId: id,
+      message: "Deleted a planned print run",
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );

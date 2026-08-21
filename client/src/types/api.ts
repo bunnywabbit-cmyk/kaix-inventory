@@ -149,3 +149,21 @@ export interface DtfPrintOrder {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ActivityAction = "CREATE" | "UPDATE" | "DELETE" | "STOCK_ADJUST";
+
+export interface ActivityLogEntry {
+  id: string;
+  action: ActivityAction;
+  entityType: string;
+  entityId: string | null;
+  message: string;
+  userId: string | null;
+  user: { email: string } | null;
+  createdAt: string;
+}
+
+export interface ActivityLogPage {
+  entries: ActivityLogEntry[];
+  nextCursor: string | null;
+}

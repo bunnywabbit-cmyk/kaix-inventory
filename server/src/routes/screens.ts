@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { prisma } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import { createScreenSchema, updateScreenSchema } from "../validators/screen.js";
@@ -53,6 +54,13 @@ screensRouter.post(
     });
     invalidateCacheKey(LIST_CACHE_KEY);
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "CREATE",
+      entityType: "PhysicalScreen",
+      entityId: screen.id,
+      message: `Added ${screen.screenNumber}`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(screen);
   }),
 );
@@ -73,6 +81,13 @@ screensRouter.patch(
     });
     invalidateCacheKey(LIST_CACHE_KEY);
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "UPDATE",
+      entityType: "PhysicalScreen",
+      entityId: screen.id,
+      message: `Updated ${screen.screenNumber} (${screen.status.replaceAll("_", " ").toLowerCase()}, ${screen.colorways.length} colorway${screen.colorways.length === 1 ? "" : "s"})`,
+      userId: req.user?.sub,
+    });
     res.json(screen);
   }),
 );
@@ -81,9 +96,16 @@ screensRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
     const { id } = idParamSchema.parse(req.params);
-    await prisma.physicalScreen.delete({ where: { id } });
+    const deleted = await prisma.physicalScreen.delete({ where: { id } });
     invalidateCacheKey(LIST_CACHE_KEY);
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "DELETE",
+      entityType: "PhysicalScreen",
+      entityId: deleted.id,
+      message: `Deleted ${deleted.screenNumber}`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );

@@ -3,6 +3,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { ConflictError } from "../lib/httpError.js";
 import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
+import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
 import { createShirtDesignSchema, updateShirtDesignSchema } from "../validators/shirtDesign.js";
@@ -89,6 +90,13 @@ shirtDesignsRouter.post(
       include: { colorways: true },
     });
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "CREATE",
+      entityType: "ShirtDesign",
+      entityId: design.id,
+      message: `Added design "${design.designName}"`,
+      userId: req.user?.sub,
+    });
     res.status(201).json(design);
   }),
 );
@@ -181,6 +189,18 @@ shirtDesignsRouter.patch(
     }, TRANSACTION_OPTIONS);
 
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "UPDATE",
+      entityType: "ShirtDesign",
+      entityId: design.id,
+      message:
+        data.active === false
+          ? `Unlisted design "${design.designName}"`
+          : data.active === true
+            ? `Relisted design "${design.designName}"`
+            : `Updated design "${design.designName}"`,
+      userId: req.user?.sub,
+    });
     res.json(design);
   }),
 );
@@ -206,7 +226,7 @@ shirtDesignsRouter.delete(
       );
     }
 
-    await prisma.$transaction(async (tx) => {
+    const deleted = await prisma.$transaction(async (tx) => {
       // Colorways (and their join rows with screens) cascade-delete with the
       // design, but that alone leaves any now-orphaned screen at whatever
       // status it was left in — free those up too.
@@ -214,14 +234,22 @@ shirtDesignsRouter.delete(
         where: { colorways: { some: { shirtDesignId: id } } },
         select: { id: true },
       });
-      await tx.shirtDesign.delete({ where: { id } });
+      const design = await tx.shirtDesign.delete({ where: { id } });
       await freeOrphanedScreens(
         tx,
         linkedScreens.map((screen) => screen.id),
       );
+      return design;
     }, TRANSACTION_OPTIONS);
 
     invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "DELETE",
+      entityType: "ShirtDesign",
+      entityId: deleted.id,
+      message: `Deleted design "${deleted.designName}"`,
+      userId: req.user?.sub,
+    });
     res.status(204).send();
   }),
 );
