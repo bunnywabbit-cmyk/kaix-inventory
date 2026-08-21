@@ -9,6 +9,7 @@ import {
   Settings,
   Shirt,
   Tags,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -20,6 +21,7 @@ export type ViewKey =
   | 'print-runs'
   | 'dtf-prints'
   | 'on-hand-stock'
+  | 'sales'
   | 'category-manager'
   | 'activity-log'
   | 'settings'
@@ -38,6 +40,7 @@ export const navItems: NavItem[] = [
   { key: 'print-runs', label: 'Print Runs', icon: Printer },
   { key: 'dtf-prints', label: 'DTF Prints', icon: Send },
   { key: 'on-hand-stock', label: 'On-Hand Stock', icon: Shirt },
+  { key: 'sales', label: 'Sales & Revenue', icon: TrendingUp },
   { key: 'category-manager', label: 'Category Manager', icon: Tags },
   { key: 'activity-log', label: 'Activity Log', icon: History },
   { key: 'settings', label: 'Settings', icon: Settings },
@@ -51,6 +54,7 @@ export const viewTitles: Record<ViewKey, string> = {
   'print-runs': 'Print Runs',
   'dtf-prints': 'DTF Prints',
   'on-hand-stock': 'On-Hand Stock',
+  sales: 'Sales & Revenue',
   'category-manager': 'Category Manager',
   'activity-log': 'Activity Log',
   settings: 'Settings',
