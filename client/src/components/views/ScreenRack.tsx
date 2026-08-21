@@ -19,14 +19,14 @@ interface ScreenRackProps {
 const NEEDS_SCREENS_PAGE_SIZE = 5
 
 function ScreenRack({ searchQuery }: ScreenRackProps) {
-  const { data: screens, loading, error, refetch } = useScreens()
+  const { data: screens, loading, error, refetch, mutate } = useScreens()
   // Linking/unlinking a screen changes `colorway.screens` inside the shirt-designs
   // response too (that's what the Needs Screens panel and the Designs page's
   // screen badges read), but the two are separately cached React Query
   // resources — creating/editing a screen only invalidates the screens cache
   // by default, so without refetching this one too, both views would keep
   // showing pre-mutation data until the 2-minute staleTime lapses.
-  const { data: designs, refetch: refetchDesigns } = useShirtDesigns()
+  const { data: designs, refetch: refetchDesigns, mutate: mutateDesigns } = useShirtDesigns()
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -41,7 +41,47 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
     window.setTimeout(() => setToastMessage(null), 3200)
   }
 
-  const handleFormSuccess = (message: string) => {
+  // Patches both caches with the just-saved screen immediately, rather than
+  // waiting on a round-trip back to Neon to refetch them — that round trip is
+  // what made the Needs Screens panel and colorway badges visibly lag behind
+  // after a save. `refetch`/`refetchDesigns` still run in the background
+  // afterward to reconcile anything this optimistic patch doesn't capture
+  // (e.g. list ordering, or a concurrent edit from elsewhere).
+  const handleFormSuccess = (message: string, savedScreen: PhysicalScreen) => {
+    const previousColorwayIds = new Set(editingScreen?.colorways.map((c) => c.id) ?? [])
+    const nextColorwayIds = new Set(savedScreen.colorways.map((c) => c.id))
+    const { colorways: _colorways, ...screenStub } = savedScreen
+
+    mutate((prev) => {
+      if (!prev) return prev
+      const exists = prev.some((s) => s.id === savedScreen.id)
+      return exists
+        ? prev.map((s) => (s.id === savedScreen.id ? savedScreen : s))
+        : [...prev, savedScreen]
+    })
+
+    mutateDesigns((prev) => {
+      if (!prev) return prev
+      return prev.map((design) => ({
+        ...design,
+        colorways: design.colorways.map((colorway) => {
+          if (nextColorwayIds.has(colorway.id)) {
+            const alreadyLinked = colorway.screens.some((s) => s.id === screenStub.id)
+            return {
+              ...colorway,
+              screens: alreadyLinked
+                ? colorway.screens.map((s) => (s.id === screenStub.id ? screenStub : s))
+                : [...colorway.screens, screenStub],
+            }
+          }
+          if (previousColorwayIds.has(colorway.id)) {
+            return { ...colorway, screens: colorway.screens.filter((s) => s.id !== screenStub.id) }
+          }
+          return colorway
+        }),
+      }))
+    })
+
     setAddModalOpen(false)
     setEditingScreen(null)
     setPresetColorwayId(null)
@@ -78,16 +118,19 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
   // for a 2-color separation) — keyed by colorway+screen since a screen
   // shared across colorways can hold a different position in each one.
   // Screens are pre-ordered by createdAt on the API, so position reflects
-  // link order, not array order.
+  // link order, not array order. Gated on `screensNeeded` rather than how
+  // many are actually linked so far — a 2-screen colorway shows "1/2" the
+  // moment its first screen is linked, not only once both are, so the user
+  // can see at a glance that one more is still needed.
   const screenOrdinals = useMemo(() => {
     const map = new Map<string, { position: number; total: number }>()
     for (const design of designs ?? []) {
       for (const colorway of design.colorways) {
-        if (colorway.screens.length < 2) continue
+        if (colorway.screensNeeded < 2) continue
         colorway.screens.forEach((linkedScreen, index) => {
           map.set(`${colorway.id}::${linkedScreen.id}`, {
             position: index + 1,
-            total: colorway.screens.length,
+            total: colorway.screensNeeded,
           })
         })
       }

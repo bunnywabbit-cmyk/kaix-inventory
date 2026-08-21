@@ -16,7 +16,10 @@ interface ScreenFormModalProps {
    * from a "needs screens" prompt elsewhere). Ignored when editing. */
   initialColorwayIds?: string[]
   onClose: () => void
-  onSuccess: (message: string) => void
+  /** `screen` is the freshly saved record straight from the API response, so the
+   * caller can patch its caches immediately instead of waiting on a refetch
+   * round-trip to Neon (which the Needs Screens panel visibly lagged behind). */
+  onSuccess: (message: string, screen: PhysicalScreen) => void
 }
 
 const inputClass =
@@ -60,13 +63,17 @@ function ScreenFormModal({
   const { data: designs } = useShirtDesigns()
 
   // Colorways are picked by first choosing a design, then its colorways. A colorway
-  // can be linked to more than one screen at once (e.g. a multi-color design needs a
-  // separate screen per ink color), so a colorway already linked elsewhere still stays
-  // pickable here. The screen's own already-linked colorways ride along on `screen`
+  // can need more than one screen (e.g. a multi-color design needs a separate screen
+  // per ink color, tracked via `screensNeeded`), so it stays pickable here until it
+  // has as many screens linked as it needs — a 1/2 colorway can still take one more,
+  // but a 2/2 one is full and drops out. The screen's own already-linked colorways
+  // are exempted from that cap (they'd otherwise vanish from the list while editing
+  // a screen that's already part of a now-full colorway) and ride along on `screen`
   // itself (from the parent's already-loaded list), so seed them in immediately —
   // otherwise the picker briefly can't resolve their names/thumbnails until the
   // separate designs fetch resolves.
   const designsForPicker = useMemo(() => {
+    const screenColorwayIds = new Set(screen?.colorways.map((c) => c.id) ?? [])
     const list: ColorwayPickerDesign[] = (designs ?? [])
       .filter((design) => design.printType === 'SILKSCREEN')
       .map((design) => ({
@@ -74,11 +81,16 @@ function ScreenFormModal({
         designName: design.designName,
         mainProductImage: design.mainProductImage,
         totalColorwayCount: design.colorways.length,
-        colorways: design.colorways.map((colorway) => ({
-          id: colorway.id,
-          colorwayName: colorway.colorwayName,
-          imageUrl: colorway.imageUrl,
-        })),
+        colorways: design.colorways
+          .filter(
+            (colorway) =>
+              screenColorwayIds.has(colorway.id) || colorway.screens.length < colorway.screensNeeded,
+          )
+          .map((colorway) => ({
+            id: colorway.id,
+            colorwayName: colorway.colorwayName,
+            imageUrl: colorway.imageUrl,
+          })),
       }))
 
     for (const colorway of screen?.colorways ?? []) {
@@ -194,16 +206,19 @@ function ScreenFormModal({
         colorwayIds,
       }
       if (isEdit) {
-        await api.patch(`/screens/${screen!.id}`, payload)
-        onSuccess(`Updated ${payload.screenNumber}.`)
+        const updated = await api.patch<PhysicalScreen>(`/screens/${screen!.id}`, payload)
+        onSuccess(`Updated ${payload.screenNumber}.`, updated)
       } else if (reusingScreen) {
         // Only the parts that actually changed — mesh/frame specs belong to
         // the physical object we're reusing, not this form.
-        await api.patch(`/screens/${reusingScreen.id}`, { status, colorwayIds })
-        onSuccess(`Linked ${payload.screenNumber}.`)
+        const updated = await api.patch<PhysicalScreen>(`/screens/${reusingScreen.id}`, {
+          status,
+          colorwayIds,
+        })
+        onSuccess(`Linked ${payload.screenNumber}.`, updated)
       } else {
-        await api.post('/screens', payload)
-        onSuccess(`Added ${payload.screenNumber}.`)
+        const created = await api.post<PhysicalScreen>('/screens', payload)
+        onSuccess(`Added ${payload.screenNumber}.`, created)
       }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong.')
