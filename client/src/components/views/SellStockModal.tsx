@@ -1,6 +1,7 @@
 import { ImageOff, Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { invalidInputClass } from '../../lib/formValidation'
 import type { FinishedGood } from '../../types/api'
 import Modal from '../ui/Modal'
@@ -60,7 +61,7 @@ function SellStockModal({ group, onClose, onSuccess }: SellStockModalProps) {
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 dark:border-slate-800">
           {imageUrl ? (
-            <img src={imageUrl} alt="" className="size-12 shrink-0 rounded-md object-cover" />
+            <img src={cldThumb(imageUrl, 104)} alt="" className="size-12 shrink-0 rounded-md object-cover" />
           ) : (
             <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-300 dark:bg-slate-800">
               <ImageOff className="size-4" />

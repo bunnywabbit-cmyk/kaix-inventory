@@ -1,6 +1,7 @@
 import { ChevronDown, ImageOff, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { cldThumb } from '../../lib/cloudinaryImage'
 
 export interface ColorwayPickerColorway {
   id: string
@@ -110,7 +111,7 @@ export function DesignSelect<T extends DesignOption>({ designs, value, onChange 
           <>
             {selected.mainProductImage ? (
               <img
-                src={selected.mainProductImage}
+                src={cldThumb(selected.mainProductImage, 72)}
                 alt=""
                 className="size-8 shrink-0 rounded-md object-cover"
               />
@@ -169,7 +170,7 @@ export function DesignSelect<T extends DesignOption>({ designs, value, onChange 
                 >
                   {design.mainProductImage ? (
                     <img
-                      src={design.mainProductImage}
+                      src={cldThumb(design.mainProductImage, 72)}
                       alt=""
                       className="size-8 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
                     />
@@ -265,7 +266,7 @@ function ColorwayPicker({ designs, selectedIds, onChange }: ColorwayPickerProps)
               >
                 {info.imageUrl ? (
                   <img
-                    src={info.imageUrl}
+                    src={cldThumb(info.imageUrl, 56)}
                     alt=""
                     className="size-6 shrink-0 rounded-full object-cover"
                   />
@@ -316,7 +317,7 @@ function ColorwayPicker({ designs, selectedIds, onChange }: ColorwayPickerProps)
               >
                 {colorway.imageUrl ? (
                   <img
-                    src={colorway.imageUrl}
+                    src={cldThumb(colorway.imageUrl, 104)}
                     alt=""
                     className="size-12 shrink-0 rounded-full object-cover"
                   />

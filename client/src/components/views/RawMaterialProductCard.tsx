@@ -1,5 +1,6 @@
 import { ImageOff, PackageMinus, PackagePlus, Pencil, Trash2 } from 'lucide-react'
 import { categoryColor } from '../../lib/categoryColor'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { analyzeVariantGroup } from '../../lib/variantMatrix'
 import type { RawMaterial } from '../../types/api'
 
@@ -42,7 +43,7 @@ function RawMaterialProductCard({ items, onEdit, onRestock, onUse, onDeleteReque
       <div className="flex flex-wrap items-center gap-3 p-4">
         {first.imageUrl ? (
           <img
-            src={first.imageUrl}
+            src={cldThumb(first.imageUrl, 96)}
             alt={first.name}
             className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
           />

@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronLeft, ChevronRight, ImageOff, Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useScreens, useShirtDesigns } from '../../hooks/useInventory'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { formatScreenNumber } from '../../lib/screenNumber'
 import { screenStatusLabels, screenStatusStyles } from '../../lib/screenStatus'
 import type { PhysicalScreen } from '../../types/api'
@@ -173,7 +174,7 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
                 >
                   {colorway.imageUrl ? (
                     <img
-                      src={colorway.imageUrl}
+                      src={cldThumb(colorway.imageUrl, 80)}
                       alt={colorway.colorwayName}
                       className="size-9 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
                     />
@@ -269,7 +270,7 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
                       <div key={colorway.id} className="flex min-w-0 items-center gap-3">
                         {colorway.imageUrl ? (
                           <img
-                            src={colorway.imageUrl}
+                            src={cldThumb(colorway.imageUrl, 120)}
                             alt={colorway.colorwayName}
                             className="size-14 shrink-0 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
                           />

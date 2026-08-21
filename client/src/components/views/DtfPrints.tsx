@@ -2,6 +2,7 @@ import { CheckCircle2, Circle, ImageOff, Layers, Pencil, Plus, Trash2 } from 'lu
 import { useMemo, useState } from 'react'
 import { useDtfPrintOrders, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import type { DtfPrintOrder } from '../../types/api'
 import AsyncState from '../ui/AsyncState'
@@ -142,7 +143,7 @@ function DtfPrints({ searchQuery }: DtfPrintsProps) {
             >
               {colorway.imageUrl ? (
                 <img
-                  src={colorway.imageUrl}
+                  src={cldThumb(colorway.imageUrl, 96)}
                   alt={design.designName}
                   className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
                 />
@@ -209,7 +210,7 @@ function DtfPrints({ searchQuery }: DtfPrintsProps) {
             >
               {order.colorway.imageUrl ? (
                 <img
-                  src={order.colorway.imageUrl}
+                  src={cldThumb(order.colorway.imageUrl, 120)}
                   alt={order.colorway.shirtDesign.designName}
                   className={`size-14 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
                     order.ordered ? 'opacity-50' : ''

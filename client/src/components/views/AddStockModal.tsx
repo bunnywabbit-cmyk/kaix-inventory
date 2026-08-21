@@ -2,6 +2,7 @@ import { ImageOff, Loader2 } from 'lucide-react'
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { invalidInputClass } from '../../lib/formValidation'
 import { SIZE_ORDER } from '../../lib/variantMatrix'
 import type { FinishedGood } from '../../types/api'
@@ -192,7 +193,7 @@ function AddStockModal({ finishedGoods, onClose, onSuccess }: AddStockModalProps
                       }`}
                     >
                       {colorway.imageUrl ? (
-                        <img src={colorway.imageUrl} alt="" className="size-6 shrink-0 rounded-full object-cover" />
+                        <img src={cldThumb(colorway.imageUrl, 56)} alt="" className="size-6 shrink-0 rounded-full object-cover" />
                       ) : (
                         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-300 dark:bg-slate-800">
                           <ImageOff className="size-3" />

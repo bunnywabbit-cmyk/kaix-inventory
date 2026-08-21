@@ -1,6 +1,7 @@
 import { ImageOff, Plus, ShoppingCart } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useFinishedGoods } from '../../hooks/useInventory'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { sortSizes } from '../../lib/variantMatrix'
 import type { FinishedGood } from '../../types/api'
 import AsyncState from '../ui/AsyncState'
@@ -161,7 +162,7 @@ function OnHandStock({ searchQuery }: OnHandStockProps) {
                 >
                   {imageUrl ? (
                     <img
-                      src={imageUrl}
+                      src={cldThumb(imageUrl, 136)}
                       alt={group.design.designName}
                       className="size-16 shrink-0 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
                     />

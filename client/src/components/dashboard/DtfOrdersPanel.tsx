@@ -1,4 +1,5 @@
 import { CheckCircle2, ImageOff, Loader2, Send } from 'lucide-react'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import type { DtfPrintOrder } from '../../types/api'
 
@@ -41,7 +42,7 @@ function DtfOrdersPanel({ items, pendingIds, onQuickMarkOrdered, onViewAll }: Dt
               <div className="flex min-w-0 items-center gap-2.5">
                 {order.colorway.imageUrl ? (
                   <img
-                    src={order.colorway.imageUrl}
+                    src={cldThumb(order.colorway.imageUrl, 80)}
                     alt=""
                     className="size-9 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
                   />

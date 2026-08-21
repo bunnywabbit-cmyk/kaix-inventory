@@ -31,7 +31,7 @@ function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-slate-200 bg-white pt-[env(safe-area-inset-top)] transition-all duration-200 ease-out lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0 lg:pt-0 dark:border-slate-800 dark:bg-slate-950 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-slate-200 bg-white pt-[env(safe-area-inset-top)] transition-all duration-200 ease-out lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950 ${
           collapsed ? 'lg:w-[76px]' : 'lg:w-64'
         } ${mobileOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0'}`}
       >

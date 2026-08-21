@@ -2,6 +2,7 @@ import { ImageOff, Loader2, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { invalidInputClass } from '../../lib/formValidation'
 import { SIZE_ORDER, sortSizes } from '../../lib/variantMatrix'
 import type { PrintRun } from '../../types/api'
@@ -345,7 +346,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                 <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
                   {design?.mainProductImage ? (
                     <img
-                      src={design.mainProductImage}
+                      src={cldThumb(design.mainProductImage, 72)}
                       alt=""
                       className="size-8 shrink-0 rounded-md object-cover"
                     />
@@ -396,7 +397,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                         >
                           {colorway.imageUrl ? (
                             <img
-                              src={colorway.imageUrl}
+                              src={cldThumb(colorway.imageUrl, 56)}
                               alt=""
                               className="size-6 shrink-0 rounded-full object-cover"
                             />
@@ -564,7 +565,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                       }`}
                     >
                       {imageUrl ? (
-                        <img src={imageUrl} alt="" className="w-20 shrink-0 self-stretch object-cover" />
+                        <img src={cldThumb(imageUrl, 180)} alt="" className="w-20 shrink-0 self-stretch object-cover" />
                       ) : (
                         <span className="flex w-20 shrink-0 items-center justify-center self-stretch bg-slate-100 text-slate-300 dark:bg-slate-800">
                           <ImageOff className="size-5" />

@@ -2,6 +2,7 @@ import { ImageOff, Loader2 } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import { invalidInputClass } from '../../lib/formValidation'
 import { DesignSelect } from '../ui/ColorwayPicker'
@@ -109,7 +110,7 @@ function DtfStockFormModal({ onClose, onSuccess }: DtfStockFormModalProps) {
                   }`}
                 >
                   {c.imageUrl ? (
-                    <img src={c.imageUrl} alt="" className="size-6 shrink-0 rounded-full object-cover" />
+                    <img src={cldThumb(c.imageUrl, 56)} alt="" className="size-6 shrink-0 rounded-full object-cover" />
                   ) : (
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-300 dark:bg-slate-800">
                       <ImageOff className="size-3" />
@@ -126,7 +127,7 @@ function DtfStockFormModal({ onClose, onSuccess }: DtfStockFormModalProps) {
           <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 dark:border-slate-800">
             {colorway.imageUrl ? (
               <img
-                src={colorway.imageUrl}
+                src={cldThumb(colorway.imageUrl, 104)}
                 alt=""
                 className="size-12 shrink-0 rounded-md object-cover"
               />

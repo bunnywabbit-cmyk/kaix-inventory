@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronDown, Circle, ImageOff, Pencil, Plus, Trash2 } fro
 import { useMemo, useState } from 'react'
 import { usePrintRuns, useRawMaterials, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { printRunStatusLabels, printRunStatusStyles } from '../../lib/printRunStatus'
 import { sortSizes } from '../../lib/variantMatrix'
 import type { PrintRun, PrintRunItem } from '../../types/api'
@@ -36,10 +37,18 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
   const [pendingFinishRun, setPendingFinishRun] = useState<PrintRun | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [collapsedRunIds, setCollapsedRunIds] = useState<Set<string>>(new Set())
+  // Finished runs are production history you're less likely to need open
+  // right away, so they start collapsed; planned runs (the ones you're
+  // actively working from) start open. This set only tracks runs whose
+  // collapsed state has been manually flipped away from that default.
+  const [toggledRunIds, setToggledRunIds] = useState<Set<string>>(new Set())
+
+  const defaultCollapsed = (run: PrintRun) => run.status === 'FINISHED'
+  const isRunCollapsed = (run: PrintRun) =>
+    toggledRunIds.has(run.id) ? !defaultCollapsed(run) : defaultCollapsed(run)
 
   const toggleCollapsed = (runId: string) => {
-    setCollapsedRunIds((prev) => {
+    setToggledRunIds((prev) => {
       const next = new Set(prev)
       if (next.has(runId)) next.delete(runId)
       else next.add(runId)
@@ -157,7 +166,7 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
               0,
             )
             const isPlanned = run.status === 'PLANNED'
-            const isCollapsed = collapsedRunIds.has(run.id)
+            const isCollapsed = isRunCollapsed(run)
 
             return (
               <div
@@ -244,7 +253,7 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
                         >
                           {imageUrl ? (
                             <img
-                              src={imageUrl}
+                              src={cldThumb(imageUrl, 96)}
                               alt={item.design.designName}
                               className={`size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
                                 item.done ? 'opacity-50' : ''

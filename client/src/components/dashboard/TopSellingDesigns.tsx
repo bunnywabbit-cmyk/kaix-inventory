@@ -1,4 +1,5 @@
 import { ImageOff, Trophy } from 'lucide-react'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import type { PrintRun } from '../../types/api'
 
 interface TopSellingDesignsProps {
@@ -68,7 +69,7 @@ function TopSellingDesigns({ printRuns, onViewAll }: TopSellingDesignsProps) {
             </span>
             {design.mainProductImage ? (
               <img
-                src={design.mainProductImage}
+                src={cldThumb(design.mainProductImage, 88)}
                 alt=""
                 className="size-10 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
               />

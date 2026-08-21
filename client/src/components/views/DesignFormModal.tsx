@@ -2,6 +2,7 @@ import { ImagePlus, Loader2, Plus, X } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 import { useMaterialPhoto } from '../../hooks/useMaterialPhoto'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { DTF_PRINT_SIZE_OPTIONS, dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import { invalidBoxClass, invalidInputClass } from '../../lib/formValidation'
 import { FIT_STYLE_OPTIONS, type FitStyle } from '../../lib/skuGenerator'
@@ -113,7 +114,7 @@ function ColorwayRow({
       {draft.previewSrc ? (
         <div className="relative">
           <img
-            src={draft.previewSrc}
+            src={cldThumb(draft.previewSrc, 104) ?? undefined}
             alt="Colorway preview"
             className="size-12 rounded-md border border-slate-200 object-cover dark:border-slate-800"
           />

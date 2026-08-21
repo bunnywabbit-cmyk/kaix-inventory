@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, Frame, ImageOff, Pencil, Plus, 
 import { useMemo, useState } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import { printTypeLabels, printTypeStyles } from '../../lib/printType'
 import { formatScreenNumber } from '../../lib/screenNumber'
@@ -106,7 +107,7 @@ function Designs({ searchQuery }: DesignsProps) {
             >
               {design.mainProductImage ? (
                 <img
-                  src={design.mainProductImage}
+                  src={cldThumb(design.mainProductImage, 96)}
                   alt={design.designName}
                   className={`size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
                     design.active ? '' : 'opacity-50'

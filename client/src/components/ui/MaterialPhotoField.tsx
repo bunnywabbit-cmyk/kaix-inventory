@@ -1,5 +1,6 @@
 import { ImageOff, ImagePlus, X } from 'lucide-react'
 import { useId } from 'react'
+import { cldThumb } from '../../lib/cloudinaryImage'
 import { invalidBoxClass } from '../../lib/formValidation'
 
 const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/webp,image/gif'
@@ -32,7 +33,7 @@ function MaterialPhotoField({
         {previewSrc ? (
           <div className="relative shrink-0">
             <img
-              src={previewSrc}
+              src={cldThumb(previewSrc, 168) ?? undefined}
               alt="Material preview"
               className="size-20 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
             />
