@@ -375,16 +375,25 @@ function Designs({ searchQuery }: DesignsProps) {
       )}
 
       {addModalOpen && (
-        <DesignFormModal onClose={() => setAddModalOpen(false)} onSuccess={handleFormSuccess} />
+        <DesignFormModal
+          existingDesigns={designs ?? []}
+          onClose={() => setAddModalOpen(false)}
+          onSuccess={handleFormSuccess}
+        />
       )}
 
       {bulkAddModalOpen && (
-        <BulkAddDesignsModal onClose={() => setBulkAddModalOpen(false)} onSuccess={handleFormSuccess} />
+        <BulkAddDesignsModal
+          existingDesigns={designs ?? []}
+          onClose={() => setBulkAddModalOpen(false)}
+          onSuccess={handleFormSuccess}
+        />
       )}
 
       {editingDesign && (
         <DesignFormModal
           design={editingDesign}
+          existingDesigns={designs ?? []}
           onClose={() => setEditingDesign(null)}
           onSuccess={handleFormSuccess}
         />

@@ -15,6 +15,7 @@ import QuantityInput from '../ui/QuantityInput'
 
 interface DesignFormModalProps {
   design?: ShirtDesign
+  existingDesigns: ShirtDesign[]
   onClose: () => void
   onSuccess: (message: string) => void
 }
@@ -210,10 +211,17 @@ function ColorwayRow({
   )
 }
 
-function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
+function DesignFormModal({ design, existingDesigns, onClose, onSuccess }: DesignFormModalProps) {
   const isEdit = Boolean(design)
 
   const [designName, setDesignName] = useState(design?.designName ?? '')
+  // Checked live (not gated behind `attempted`) so the same "taken" feedback a
+  // username field gives shows up as soon as it's true, not just on submit.
+  const isDuplicateName = existingDesigns.some(
+    (other) =>
+      other.id !== design?.id &&
+      other.designName.trim().toLowerCase() === designName.trim().toLowerCase(),
+  )
   const [printType, setPrintType] = useState<PrintType>(design?.printType ?? 'SILKSCREEN')
   const [price, setPrice] = useState(design?.price != null ? String(design.price) : '')
   const [availableFits, setAvailableFits] = useState<FitStyle[]>(
@@ -334,6 +342,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
 
   const canSubmit = Boolean(
     designName.trim() &&
+      !isDuplicateName &&
       photo.previewSrc &&
       availableFits.length > 0 &&
       colorways.length > 0 &&
@@ -344,7 +353,11 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
     event.preventDefault()
     if (!canSubmit) {
       setAttempted(true)
-      setFormError('Fill in the highlighted fields before saving.')
+      setFormError(
+        isDuplicateName
+          ? 'A design with this name already exists.'
+          : 'Fill in the highlighted fields before saving.',
+      )
       return
     }
 
@@ -410,8 +423,16 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
             value={designName}
             onChange={(event) => setDesignName(event.target.value)}
             placeholder="e.g. Kaix Logo Tee"
-            className={attempted && !designName.trim() ? inputClassInvalid : inputClass}
+            aria-invalid={isDuplicateName || (attempted && !designName.trim())}
+            className={
+              isDuplicateName || (attempted && !designName.trim()) ? inputClassInvalid : inputClass
+            }
           />
+          {isDuplicateName && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              A design with this name already exists.
+            </p>
+          )}
         </div>
 
         <MaterialPhotoField

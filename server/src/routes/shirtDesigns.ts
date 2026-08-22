@@ -75,6 +75,15 @@ shirtDesignsRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const { colorways, ...data } = createShirtDesignSchema.parse(req.body);
+
+    const duplicate = await prisma.shirtDesign.findFirst({
+      where: { designName: { equals: data.designName, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictError(`A design named "${data.designName}" already exists.`);
+    }
+
     const design = await prisma.shirtDesign.create({
       data: {
         ...data,
@@ -112,6 +121,21 @@ shirtDesignsRouter.post(
   "/batch",
   asyncHandler(async (req, res) => {
     const { items } = createShirtDesignBatchSchema.parse(req.body);
+
+    const existing = await prisma.shirtDesign.findMany({ select: { designName: true } });
+    const existingLower = new Set(existing.map((d) => d.designName.trim().toLowerCase()));
+    const seenInBatch = new Set<string>();
+    for (const item of items) {
+      const lower = item.designName.trim().toLowerCase();
+      if (existingLower.has(lower)) {
+        throw new ConflictError(`A design named "${item.designName}" already exists.`);
+      }
+      if (seenInBatch.has(lower)) {
+        throw new ConflictError(`Duplicate design name "${item.designName}" in this batch.`);
+      }
+      seenInBatch.add(lower);
+    }
+
     const created = await prisma.$transaction(
       items.map(({ colorways, ...data }) =>
         prisma.shirtDesign.create({
@@ -149,6 +173,16 @@ shirtDesignsRouter.patch(
   asyncHandler(async (req, res) => {
     const { id } = idParamSchema.parse(req.params);
     const { colorways, ...data } = updateShirtDesignSchema.parse(req.body);
+
+    if (data.designName) {
+      const duplicate = await prisma.shirtDesign.findFirst({
+        where: { id: { not: id }, designName: { equals: data.designName, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ConflictError(`A design named "${data.designName}" already exists.`);
+      }
+    }
 
     const design = await prisma.$transaction(async (tx) => {
       if (colorways) {

@@ -12,6 +12,7 @@ import PriceInput from '../ui/PriceInput'
 import QuantityInput from '../ui/QuantityInput'
 
 interface BulkAddDesignsModalProps {
+  existingDesigns: ShirtDesign[]
   onClose: () => void
   onSuccess: (message: string) => void
 }
@@ -89,6 +90,16 @@ function isDraftComplete(draft: DesignDraft) {
   return draft.colorways.every((colorway) => isColorwayComplete(colorway, draft.printType))
 }
 
+// Checked against both already-saved designs and every other row in this same
+// batch — two rows named the same thing would otherwise both sail through
+// since neither one alone collides with anything in `existingDesigns`.
+function isDuplicateName(draft: DesignDraft, allDrafts: DesignDraft[], existingDesigns: ShirtDesign[]) {
+  const name = draft.designName.trim().toLowerCase()
+  if (!name) return false
+  if (existingDesigns.some((d) => d.designName.trim().toLowerCase() === name)) return true
+  return allDrafts.some((d) => d.key !== draft.key && d.designName.trim().toLowerCase() === name)
+}
+
 interface ImagePickerCellProps {
   previewSrc: string | null
   invalid: boolean
@@ -142,7 +153,7 @@ function ImagePickerCell({ previewSrc, invalid, ariaLabel, onFileChange, onRemov
   )
 }
 
-function BulkAddDesignsModal({ onClose, onSuccess }: BulkAddDesignsModalProps) {
+function BulkAddDesignsModal({ existingDesigns, onClose, onSuccess }: BulkAddDesignsModalProps) {
   const [drafts, setDrafts] = useState<DesignDraft[]>([blankDraft()])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -211,13 +222,19 @@ function BulkAddDesignsModal({ onClose, onSuccess }: BulkAddDesignsModalProps) {
       imagePreview: file ? URL.createObjectURL(file) : null,
     })
 
-  const canSubmit = drafts.length > 0 && drafts.every(isDraftComplete)
+  const canSubmit =
+    drafts.length > 0 &&
+    drafts.every((d) => isDraftComplete(d) && !isDuplicateName(d, drafts, existingDesigns))
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!canSubmit) {
       setAttempted(true)
-      setFormError('Fill in the highlighted fields before saving.')
+      setFormError(
+        drafts.some((d) => isDuplicateName(d, drafts, existingDesigns))
+          ? 'One or more design names are already in use — see the highlighted fields.'
+          : 'Fill in the highlighted fields before saving.',
+      )
       return
     }
 
@@ -267,7 +284,8 @@ function BulkAddDesignsModal({ onClose, onSuccess }: BulkAddDesignsModalProps) {
 
         <div className="space-y-3">
           {drafts.map((draft, index) => {
-            const nameInvalid = attempted && !draft.designName.trim()
+            const duplicateName = isDuplicateName(draft, drafts, existingDesigns)
+            const nameInvalid = duplicateName || (attempted && !draft.designName.trim())
             const mainImageInvalid = attempted && !draft.mainImagePreview
             const fitsInvalid = attempted && draft.availableFits.length === 0
 
@@ -327,6 +345,12 @@ function BulkAddDesignsModal({ onClose, onSuccess }: BulkAddDesignsModalProps) {
                     />
                   </div>
                 </div>
+
+                {duplicateName && (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    This design name is already in use.
+                  </p>
+                )}
 
                 <div className={`flex flex-wrap gap-1.5 rounded-lg ${fitsInvalid ? 'p-1 ring-1 ring-red-500' : ''}`}>
                   {FIT_STYLE_OPTIONS.map((fit) => (
