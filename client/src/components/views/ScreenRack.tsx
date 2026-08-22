@@ -19,6 +19,65 @@ interface ScreenRackProps {
 // rows once a shop has a lot of designs waiting on screens.
 const NEEDS_SCREENS_PAGE_SIZE = 5
 
+interface ScreenColorwayListProps {
+  screen: PhysicalScreen
+  screenOrdinals: Map<string, { position: number; total: number }>
+}
+
+// The colorway/product list shown on each screen card's desktop/tablet row.
+// (Mobile builds its own version inline — the screen number/status/mesh
+// group needs to sit alongside just the first colorway row there, which
+// doesn't fit this component's shape.)
+function ScreenColorwayList({ screen, screenOrdinals }: ScreenColorwayListProps) {
+  if (screen.colorways.length === 0) {
+    return (
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+          <ImageOff className="size-5" />
+        </span>
+        <p className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300">Unassigned</p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {screen.colorways.map((colorway) => {
+        const ordinal = screenOrdinals.get(`${colorway.id}::${screen.id}`)
+        return (
+          <div key={colorway.id} className="flex min-w-0 items-center gap-3">
+            {colorway.imageUrl ? (
+              <img
+                src={cldThumb(colorway.imageUrl, 120)}
+                alt={colorway.colorwayName}
+                className="size-14 shrink-0 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+              />
+            ) : (
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                <ImageOff className="size-5" />
+              </span>
+            )}
+            <p
+              className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300"
+              title={`${colorway.colorwayName} — ${colorway.shirtDesign.designName}`}
+            >
+              {colorway.colorwayName}
+              {ordinal && (
+                <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                  {ordinal.position}/{ordinal.total}
+                </span>
+              )}
+              <span className="block truncate text-xs text-slate-400">
+                {colorway.shirtDesign.designName}
+              </span>
+            </p>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function ScreenRack({ searchQuery }: ScreenRackProps) {
   const { data: screens, loading, error, refetch, mutate } = useScreens()
   // Linking/unlinking a screen changes `colorway.screens` inside the shirt-designs
@@ -281,106 +340,168 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
       {!loading && !error && (
         <div className="space-y-3">
           {filtered.map((screen) => {
-            return (
-              <div
-                key={screen.id}
-                className="grid grid-cols-[8rem_14rem_1fr_1fr_1fr_1fr_auto] items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60"
+            const editButton = (
+              <button
+                type="button"
+                onClick={() => setEditingScreen(screen)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                <Pencil className="size-3.5" />
+                Edit
+              </button>
+            )
+
+            // Screen number, status pill, and mesh count — one right-aligned
+            // group shown once per card, alongside the *first* colorway row
+            // only (a screen with several linked colorways would otherwise
+            // repeat it once per row).
+            const headerInfo = (
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="shrink-0 text-xs font-bold text-slate-900 dark:text-white">
                     {formatScreenNumber(screen.screenNumber)}
-                  </p>
+                  </span>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${screenStatusStyles[screen.status]}`}
+                    className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${screenStatusStyles[screen.status]}`}
                   >
                     {screenStatusLabels[screen.status]}
                   </span>
                 </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  {screen.colorways.length === 0 ? (
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
-                        <ImageOff className="size-5" />
-                      </span>
-                      <p className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300">
-                        Unassigned
-                      </p>
-                    </div>
-                  ) : (
-                    screen.colorways.map((colorway) => {
-                      const ordinal = screenOrdinals.get(`${colorway.id}::${screen.id}`)
-                      return (
-                      <div key={colorway.id} className="flex min-w-0 items-center gap-3">
-                        {colorway.imageUrl ? (
-                          <img
-                            src={cldThumb(colorway.imageUrl, 120)}
-                            alt={colorway.colorwayName}
-                            className="size-14 shrink-0 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
-                          />
-                        ) : (
-                          <span className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
-                            <ImageOff className="size-5" />
-                          </span>
-                        )}
-                        <p
-                          className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300"
-                          title={`${colorway.colorwayName} — ${colorway.shirtDesign.designName}`}
-                        >
-                          {colorway.colorwayName}
-                          {ordinal && (
-                            <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                              {ordinal.position}/{ordinal.total}
-                            </span>
-                          )}
-                          <span className="block truncate text-xs text-slate-400">
-                            {colorway.shirtDesign.designName}
-                          </span>
-                        </p>
-                      </div>
-                      )
-                    })
-                  )}
-                </div>
-
-                <div className="text-xs text-slate-500">
-                  Mesh
-                  <br />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <span className="shrink-0 text-[11px] text-slate-500">
+                  Mesh{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
                     {screen.meshCount}
                   </span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Frame
-                  <br />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {screen.frameType}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Size
-                  <br />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {screen.frameSize ?? '—'}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Updated
-                  <br />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {new Date(screen.updatedAt).toLocaleDateString()}
-                  </span>
+                </span>
+              </div>
+            )
+
+            return (
+              <div key={screen.id}>
+                {/* Mobile: a compact card — image + product/variation on the
+                    left, screen number/status/mesh on the right, all in the
+                    same row. */}
+                <div className="rounded-xl border border-slate-200 bg-white py-3 pl-2.5 pr-3 dark:border-slate-800 dark:bg-slate-900/60 sm:hidden">
+                  <div className="flex flex-col gap-2">
+                    {screen.colorways.length === 0 ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex size-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                            <ImageOff className="size-5" />
+                          </span>
+                          <p className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300">
+                            Unassigned
+                          </p>
+                        </div>
+                        {headerInfo}
+                      </div>
+                    ) : (
+                      screen.colorways.map((colorway, index) => {
+                        const ordinal = screenOrdinals.get(`${colorway.id}::${screen.id}`)
+                        return (
+                          <div key={colorway.id} className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              {colorway.imageUrl ? (
+                                <img
+                                  src={cldThumb(colorway.imageUrl, 160)}
+                                  alt={colorway.colorwayName}
+                                  className="size-20 shrink-0 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+                                />
+                              ) : (
+                                <span className="flex size-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                                  <ImageOff className="size-5" />
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p
+                                  className="truncate text-sm text-slate-600 dark:text-slate-300"
+                                  title={`${colorway.colorwayName} — ${colorway.shirtDesign.designName}`}
+                                >
+                                  {colorway.colorwayName}
+                                  {ordinal && (
+                                    <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                                      {ordinal.position}/{ordinal.total}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="truncate text-xs text-slate-400">
+                                  {colorway.shirtDesign.designName}
+                                </p>
+                              </div>
+                            </div>
+                            {index === 0 && headerInfo}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                    <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                      <span>
+                        Frame{' '}
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {screen.frameType}
+                        </span>
+                      </span>
+                      <span>
+                        Size{' '}
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {screen.frameSize ?? '—'}
+                        </span>
+                      </span>
+                    </div>
+                    {editButton}
+                  </div>
                 </div>
 
-                <div className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setEditingScreen(screen)}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    <Pencil className="size-3.5" />
-                    Edit
-                  </button>
+                {/* Desktop / tablet: unchanged 7-column grid. */}
+                <div className="hidden items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60 sm:grid sm:grid-cols-[8rem_14rem_1fr_1fr_1fr_1fr_auto]">
+                  <div className="flex shrink-0 flex-col items-center gap-1 text-center">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      {formatScreenNumber(screen.screenNumber)}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${screenStatusStyles[screen.status]}`}
+                    >
+                      {screenStatusLabels[screen.status]}
+                    </span>
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <ScreenColorwayList screen={screen} screenOrdinals={screenOrdinals} />
+                  </div>
+
+                  <div className="text-xs text-slate-500">
+                    Mesh
+                    <br />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {screen.meshCount}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Frame
+                    <br />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {screen.frameType}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Size
+                    <br />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {screen.frameSize ?? '—'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Updated
+                    <br />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {new Date(screen.updatedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="shrink-0">{editButton}</div>
                 </div>
               </div>
             )

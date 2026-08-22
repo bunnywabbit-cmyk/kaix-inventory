@@ -135,10 +135,11 @@ function RawMaterials({ searchQuery }: RawMaterialsProps) {
         <button
           type="button"
           onClick={() => setAddModalOpen(true)}
+          aria-label="Add Raw Material"
           className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           <Plus className="size-4" />
-          Add Raw Material
+          <span className="hidden sm:inline">Add Raw Material</span>
         </button>
       </div>
 

@@ -71,14 +71,23 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
 
   const filtered = useMemo(() => {
     if (!printRuns) return []
-    if (!query) return printRuns
-    return printRuns.filter((run) =>
-      run.items.some((item) =>
-        [item.design.designName, item.garmentStyle, item.colorway?.colorwayName, item.color]
-          .filter(Boolean)
-          .some((field) => field!.toLowerCase().includes(query)),
-      ),
-    )
+    const matched = query
+      ? printRuns.filter((run) =>
+          run.items.some((item) =>
+            [item.design.designName, item.garmentStyle, item.colorway?.colorwayName, item.color]
+              .filter(Boolean)
+              .some((field) => field!.toLowerCase().includes(query)),
+          ),
+        )
+      : printRuns
+    // Planned runs are the active work — always above finished ones,
+    // regardless of date. A stable sort keeps each group's existing
+    // (createdAt-desc) order intact within itself.
+    return [...matched].sort((a, b) => {
+      const aWeight = a.status === 'PLANNED' ? 0 : 1
+      const bWeight = b.status === 'PLANNED' ? 0 : 1
+      return aWeight - bWeight
+    })
   }, [printRuns, query])
 
   const handleFormSuccess = (message: string) => {
@@ -164,10 +173,11 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
         <button
           type="button"
           onClick={() => setAddModalOpen(true)}
+          aria-label="Create Print Run"
           className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           <Plus className="size-4" />
-          Create Print Run
+          <span className="hidden sm:inline">Create Print Run</span>
         </button>
       </div>
 
@@ -276,92 +286,154 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
                         ? [...coverageBySize.values()].some((covered) => covered > 0)
                         : false
 
-                      return (
-                        <div
-                          key={item.id}
-                          className={`flex flex-wrap items-center gap-3 px-4 py-3 transition-colors ${
+                      const rowTint = item.done
+                        ? 'bg-emerald-50/60 dark:bg-emerald-500/5'
+                        : hasOnHandMatch
+                          ? 'bg-amber-50/60 dark:bg-amber-500/5'
+                          : ''
+
+                      const markDoneButton = isPlanned && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleDone(run.id, item)}
+                          aria-label={
                             item.done
-                              ? 'bg-emerald-50/60 dark:bg-emerald-500/5'
-                              : hasOnHandMatch
-                                ? 'bg-amber-50/60 dark:bg-amber-500/5'
-                                : ''
+                              ? `Mark ${item.design.designName} not done`
+                              : `Mark ${item.design.designName} done`
+                          }
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                            item.done
+                              ? 'border-emerald-400 bg-emerald-500 text-white hover:bg-emerald-600'
+                              : 'border-slate-200 text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
                           }`}
                         >
-                          {imageUrl ? (
-                            <img
-                              src={cldThumb(imageUrl, 96)}
-                              alt={item.design.designName}
-                              className={`size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
-                                item.done ? 'opacity-50' : ''
-                              }`}
-                            />
-                          ) : (
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
-                              <ImageOff className="size-4" />
-                            </div>
-                          )}
+                          {item.done ? <CheckCircle2 className="size-3.5" /> : <Circle className="size-3.5" />}
+                          <span className="hidden sm:inline">{item.done ? 'Done' : 'Mark Done'}</span>
+                        </button>
+                      )
 
-                          <div className={`w-44 shrink-0 ${item.done ? 'opacity-60' : ''}`}>
-                            <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                              {item.design.designName}
-                            </p>
-                            <p className="truncate text-xs text-slate-500">
-                              {[item.colorway?.colorwayName ?? item.color, item.garmentStyle].join(' · ')}
-                            </p>
-                            {hasOnHandMatch && (
-                              <p className="truncate text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                                Already on hand — will deduct, not reprint
-                              </p>
+                      return (
+                        <div key={item.id}>
+                          {/* Mobile: everything in one row — image, truncated
+                              name, compact size pills (scrolls horizontally
+                              if there are many), icon-only Mark Done. */}
+                          <div className={`flex items-center gap-2 px-3 py-2.5 transition-colors sm:hidden ${rowTint}`}>
+                            {imageUrl ? (
+                              <img
+                                src={cldThumb(imageUrl, 96)}
+                                alt={item.design.designName}
+                                className={`size-9 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
+                                  item.done ? 'opacity-50' : ''
+                                }`}
+                              />
+                            ) : (
+                              <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                                <ImageOff className="size-3.5" />
+                              </div>
                             )}
-                          </div>
 
-                          <div className={`flex flex-1 flex-wrap items-center gap-1.5 ${item.done ? 'opacity-60' : ''}`}>
-                            {sizes.map((entry) => {
-                              const covered = coverageBySize?.get(entry.size) ?? 0
-                              return (
-                                <span
-                                  key={entry.id}
-                                  title={
-                                    covered > 0
-                                      ? `${covered} of ${entry.quantity} already on hand — will deduct from stock instead of a fresh print`
-                                      : undefined
-                                  }
-                                  className={`rounded-md border px-2 py-1 text-xs font-semibold ${
-                                    covered > 0
-                                      ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
-                                      : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
-                                  }`}
-                                >
-                                  {entry.size}{' '}
-                                  <span
-                                    className={`tabular-nums ${covered > 0 ? '' : 'text-slate-900 dark:text-white'}`}
-                                  >
-                                    {entry.quantity}
-                                  </span>
-                                  {covered > 0 && <span className="ml-1">&middot; {covered}/{entry.quantity}</span>}
-                                </span>
-                              )
-                            })}
-                          </div>
+                            <div className={`min-w-0 flex-1 ${item.done ? 'opacity-60' : ''}`}>
+                              <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                                {[item.colorway?.colorwayName ?? item.color, item.garmentStyle].join(' · ')}
+                              </p>
+                              <p className="truncate text-[11px] text-slate-500">{item.design.designName}</p>
+                            </div>
 
-                          <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-                            {itemTotal} pcs
-                          </span>
-
-                          {isPlanned && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleDone(run.id, item)}
-                              className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                                item.done
-                                  ? 'border-emerald-400 bg-emerald-500 text-white hover:bg-emerald-600'
-                                  : 'border-slate-200 text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
-                              }`}
+                            <div
+                              className={`flex shrink-0 items-center gap-1 overflow-x-auto ${item.done ? 'opacity-60' : ''}`}
                             >
-                              {item.done ? <CheckCircle2 className="size-3.5" /> : <Circle className="size-3.5" />}
-                              {item.done ? 'Done' : 'Mark Done'}
-                            </button>
-                          )}
+                              {sizes.map((entry) => {
+                                const covered = coverageBySize?.get(entry.size) ?? 0
+                                return (
+                                  <span
+                                    key={entry.id}
+                                    title={
+                                      covered > 0
+                                        ? `${covered} of ${entry.quantity} already on hand — will deduct from stock instead of a fresh print`
+                                        : undefined
+                                    }
+                                    className={`shrink-0 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${
+                                      covered > 0
+                                        ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
+                                        : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    {entry.size} {entry.quantity}
+                                  </span>
+                                )
+                              })}
+                            </div>
+
+                            {markDoneButton}
+                          </div>
+
+                          {/* Desktop / tablet: unchanged wrapping row. */}
+                          <div
+                            className={`hidden flex-wrap items-center gap-3 px-4 py-3 transition-colors sm:flex ${rowTint}`}
+                          >
+                            {imageUrl ? (
+                              <img
+                                src={cldThumb(imageUrl, 96)}
+                                alt={item.design.designName}
+                                className={`size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800 ${
+                                  item.done ? 'opacity-50' : ''
+                                }`}
+                              />
+                            ) : (
+                              <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+                                <ImageOff className="size-4" />
+                              </div>
+                            )}
+
+                            <div className={`w-44 shrink-0 ${item.done ? 'opacity-60' : ''}`}>
+                              <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                                {item.design.designName}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {[item.colorway?.colorwayName ?? item.color, item.garmentStyle].join(' · ')}
+                              </p>
+                              {hasOnHandMatch && (
+                                <p className="truncate text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                  Already on hand — will deduct, not reprint
+                                </p>
+                              )}
+                            </div>
+
+                            <div className={`flex flex-1 flex-wrap items-center gap-1.5 ${item.done ? 'opacity-60' : ''}`}>
+                              {sizes.map((entry) => {
+                                const covered = coverageBySize?.get(entry.size) ?? 0
+                                return (
+                                  <span
+                                    key={entry.id}
+                                    title={
+                                      covered > 0
+                                        ? `${covered} of ${entry.quantity} already on hand — will deduct from stock instead of a fresh print`
+                                        : undefined
+                                    }
+                                    className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                                      covered > 0
+                                        ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
+                                        : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    {entry.size}{' '}
+                                    <span
+                                      className={`tabular-nums ${covered > 0 ? '' : 'text-slate-900 dark:text-white'}`}
+                                    >
+                                      {entry.quantity}
+                                    </span>
+                                    {covered > 0 && <span className="ml-1">&middot; {covered}/{entry.quantity}</span>}
+                                  </span>
+                                )
+                              })}
+                            </div>
+
+                            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+                              {itemTotal} pcs
+                            </span>
+
+                            {markDoneButton}
+                          </div>
                         </div>
                       )
                     })}

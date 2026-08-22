@@ -1,5 +1,4 @@
 import { ImageOff, PackageMinus, PackagePlus, Pencil, Trash2 } from 'lucide-react'
-import { categoryColor } from '../../lib/categoryColor'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { analyzeVariantGroup } from '../../lib/variantMatrix'
 import type { RawMaterial } from '../../types/api'
@@ -12,17 +11,23 @@ interface RawMaterialProductCardProps {
   onDeleteRequest: (items: RawMaterial[]) => void
 }
 
+// justify-center matters once these sit in the mobile action grid below,
+// where each button stretches to fill an equal-width cell — without it the
+// icon would hug the left edge of that now-wider box instead of staying
+// centered. It's a no-op everywhere else these are used (desktop, and any
+// other shrink-to-fit context), since the box already matches its content
+// there.
 const editButtonClass =
-  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
 
 const restockButtonClass =
-  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
 
 const useButtonClass =
-  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
 
 const deleteButtonClass =
-  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
 
 const quantityPillClass =
   'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
@@ -31,79 +36,122 @@ function RawMaterialProductCard({ items, onEdit, onRestock, onUse, onDeleteReque
   const first = items[0]!
   const isGroup = items.length > 1
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
-  const subtitle = [first.brand, first.styleNumber].filter(Boolean).join(' · ')
-  const dot = categoryColor(first.category.name).dot
 
   const { matrixReady, colors, sizes } = analyzeVariantGroup(items)
   const cellFor = (color: string, size: string) =>
     items.find((item) => item.color === color && item.size === size)
 
+  const image = first.imageUrl ? (
+    <img
+      src={cldThumb(first.imageUrl, 96)}
+      alt={first.name}
+      className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
+    />
+  ) : (
+    <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
+      <ImageOff className="size-4" />
+    </div>
+  )
+
+  const pills = (
+    <>
+      {isGroup && (
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          {items.length} variants
+        </span>
+      )}
+      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${quantityPillClass}`}>
+        {totalQuantity} {first.unit ?? ''}
+      </span>
+      {!isGroup && first.pricePerUnit !== null && (
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          ${first.pricePerUnit.toFixed(2)}/pc
+        </span>
+      )}
+      {!isGroup && first.courierFee !== null && (
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          +${first.courierFee.toFixed(2)} courier
+        </span>
+      )}
+    </>
+  )
+
+  const actionButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => onRestock(items)}
+        aria-label={`Restock ${first.name}`}
+        className={restockButtonClass}
+      >
+        <PackagePlus className="size-3.5" />
+        <span className="hidden sm:inline">Restock</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onUse(items)}
+        disabled={totalQuantity === 0}
+        aria-label={`Use ${first.name}`}
+        className={`${useButtonClass} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-transparent disabled:hover:text-slate-600 dark:disabled:hover:text-slate-300`}
+      >
+        <PackageMinus className="size-3.5" />
+        <span className="hidden sm:inline">Use</span>
+      </button>
+      {!isGroup && (
+        <button
+          type="button"
+          onClick={() => onEdit(first)}
+          aria-label={`Edit ${first.name}`}
+          className={editButtonClass}
+        >
+          <Pencil className="size-3.5" />
+          <span className="hidden sm:inline">Edit</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onDeleteRequest(items)}
+        aria-label={`Delete ${first.name}`}
+        className={deleteButtonClass}
+      >
+        <Trash2 className="size-3.5" />
+        <span className="hidden sm:inline">Delete</span>
+      </button>
+    </>
+  )
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
-      <div className="flex flex-wrap items-center gap-3 p-4">
-        {first.imageUrl ? (
-          <img
-            src={cldThumb(first.imageUrl, 96)}
-            alt={first.name}
-            className="size-11 shrink-0 rounded-md border border-slate-200 object-cover dark:border-slate-800"
-          />
-        ) : (
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700">
-            <ImageOff className="size-4" />
+      {/* Mobile: image + name on the left, quantity/variant pills stacked
+          above the (icon-only) action buttons on the right. */}
+      <div className="flex items-center justify-between gap-3 p-3 sm:hidden">
+        <div className="flex min-w-0 items-center gap-3">
+          {image}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+              {first.name}
+            </p>
+            <p className="truncate text-xs text-slate-500">{first.category.name}</p>
           </div>
-        )}
+        </div>
+        <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">{pills}</div>
+          <div className="flex items-center justify-center gap-1">{actionButtons}</div>
+        </div>
+      </div>
+
+      {/* Desktop / tablet: unchanged wrapping row. */}
+      <div className="hidden flex-wrap items-center gap-3 p-4 sm:flex">
+        {image}
 
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-slate-900 dark:text-slate-100">{first.name}</p>
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            {subtitle && <span>{subtitle} &middot;</span>}
-            <span className={`size-1.5 rounded-full ${dot}`} />
-            {first.category.name}
-          </p>
+          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{first.name}</p>
+          <p className="truncate text-xs text-slate-500">{first.category.name}</p>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {isGroup && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {items.length} variants
-            </span>
-          )}
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${quantityPillClass}`}>
-            {totalQuantity} {first.unit ?? ''}
-          </span>
-          {!isGroup && first.pricePerUnit !== null && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              ${first.pricePerUnit.toFixed(2)}/pc
-            </span>
-          )}
-          {!isGroup && first.courierFee !== null && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              +${first.courierFee.toFixed(2)} courier
-            </span>
-          )}
-          <button type="button" onClick={() => onRestock(items)} className={restockButtonClass}>
-            <PackagePlus className="size-3.5" />
-            Restock
-          </button>
-          <button
-            type="button"
-            onClick={() => onUse(items)}
-            disabled={totalQuantity === 0}
-            className={`${useButtonClass} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-transparent disabled:hover:text-slate-600 dark:disabled:hover:text-slate-300`}
-          >
-            <PackageMinus className="size-3.5" />
-            Use
-          </button>
-          {!isGroup && (
-            <button type="button" onClick={() => onEdit(first)} className={editButtonClass}>
-              <Pencil className="size-3.5" />
-              Edit
-            </button>
-          )}
-          <button type="button" onClick={() => onDeleteRequest(items)} className={deleteButtonClass}>
-            <Trash2 className="size-3.5" />
-            Delete
-          </button>
+          {pills}
+          {actionButtons}
         </div>
       </div>
 

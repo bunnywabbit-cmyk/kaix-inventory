@@ -21,7 +21,7 @@ function QuickActionsBar({
   ]
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="grid grid-cols-2 gap-3">
       {actions.map((action) => {
         const Icon = action.icon
         return (
@@ -31,8 +31,8 @@ function QuickActionsBar({
             onClick={action.onClick}
             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-sky-500/40 hover:bg-sky-50 hover:text-sky-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-sky-400"
           >
-            <Icon className="size-4" />
-            {action.label}
+            <Icon className="size-4 shrink-0" />
+            <span className="truncate">{action.label}</span>
           </button>
         )
       })}
