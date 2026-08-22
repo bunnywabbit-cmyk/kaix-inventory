@@ -1,4 +1,4 @@
-export type PrintType = "SILKSCREEN" | "DTF";
+export type PrintType = "SILKSCREEN" | "DTF" | "HYBRID";
 
 export type ScreenStatus =
   | "CLEAN_RECLAIMED"

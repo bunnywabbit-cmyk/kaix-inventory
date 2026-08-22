@@ -4,18 +4,16 @@ import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
-import { invalidInputClass } from '../../lib/formValidation'
+import { usesDtf } from '../../lib/printType'
 import { DesignSelect } from '../ui/ColorwayPicker'
 import Modal from '../ui/Modal'
+import QuantityInput from '../ui/QuantityInput'
 
 interface DtfStockFormModalProps {
   onClose: () => void
   onSuccess: (message: string) => void
 }
 
-const inputClass =
-  'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
-const inputClassInvalid = `mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:bg-slate-950 dark:text-slate-100 ${invalidInputClass}`
 const labelClass = 'text-xs font-medium text-slate-500'
 
 function DtfStockFormModal({ onClose, onSuccess }: DtfStockFormModalProps) {
@@ -26,7 +24,7 @@ function DtfStockFormModal({ onClose, onSuccess }: DtfStockFormModalProps) {
   const stockableDesigns = useMemo(
     () =>
       (designs ?? [])
-        .filter((d) => d.printType === 'DTF')
+        .filter((d) => usesDtf(d.printType))
         .map((d) => ({
           ...d,
           colorways: d.colorways.filter((c) => c.dtfPrintSize),
@@ -154,14 +152,15 @@ function DtfStockFormModal({ onClose, onSuccess }: DtfStockFormModalProps) {
           <label className={labelClass} htmlFor="dtf-stock-quantity">
             Quantity to Add
           </label>
-          <input
+          <QuantityInput
             id="dtf-stock-quantity"
-            type="number"
             min={1}
             value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
+            onChange={setQuantity}
             placeholder="e.g. 50"
-            className={attempted && parsedQuantity <= 0 ? inputClassInvalid : inputClass}
+            ariaLabel="Quantity to add"
+            invalid={attempted && parsedQuantity <= 0}
+            className="mt-1 w-full"
           />
         </div>
 

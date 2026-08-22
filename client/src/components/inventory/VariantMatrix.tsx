@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { cellKey, SIZE_ORDER } from '../../lib/variantMatrix'
 import PriceInput from '../ui/PriceInput'
+import QuantityInput from '../ui/QuantityInput'
 
 interface VariantMatrixProps {
   colors: string[]
@@ -119,12 +120,12 @@ function VariantMatrix({
                   {sizes.map((size) => (
                     <th
                       key={size}
-                      className="w-24 border-b border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-500 dark:border-slate-800"
+                      className="w-32 border-b border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-500 dark:border-slate-800"
                     >
                       {size}
                     </th>
                   ))}
-                  <th className="w-36 border-b border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-500 dark:border-slate-800">
+                  <th className="w-44 border-b border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-500 dark:border-slate-800">
                     Quick Fill
                   </th>
                 </tr>
@@ -151,7 +152,7 @@ function VariantMatrix({
                       const key = cellKey(color, size)
                       const qty = quantities[key] ?? 0
                       return (
-                        <td key={size} className="w-24 px-2 py-2 text-center">
+                        <td key={size} className="w-32 px-2 py-2 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <PriceInput
                               id={`vm-price-${key}`}
@@ -161,30 +162,21 @@ function VariantMatrix({
                               dense
                               className="w-16"
                             />
-                            <input
-                              type="number"
-                              min={0}
-                              value={qty || ''}
-                              onChange={(event) =>
-                                onQuantityChange(
-                                  color,
-                                  size,
-                                  Math.max(0, Number(event.target.value) || 0),
-                                )
+                            <QuantityInput
+                              value={qty ? String(qty) : ''}
+                              onChange={(value) =>
+                                onQuantityChange(color, size, Math.max(0, Number(value) || 0))
                               }
-                              placeholder="0"
+                              ariaLabel={`Quantity for ${color} ${size}`}
                               title={skuFor(color, size)}
-                              className={`w-16 rounded-md border px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 ${
-                                qty > 0
-                                  ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200'
-                                  : 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200'
-                              }`}
+                              dense
+                              highlighted={qty > 0}
                             />
                           </div>
                         </td>
                       )
                     })}
-                    <td className="w-36 px-2 py-2">
+                    <td className="w-44 px-2 py-2">
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center justify-center gap-1">
                           <PriceInput
@@ -206,16 +198,14 @@ function VariantMatrix({
                           </button>
                         </div>
                         <div className="flex items-center justify-center gap-1">
-                          <input
-                            type="number"
-                            min={0}
+                          <QuantityInput
                             value={fillValues[color] ?? ''}
-                            onChange={(event) =>
-                              setFillValues((prev) => ({ ...prev, [color]: event.target.value }))
+                            onChange={(value) =>
+                              setFillValues((prev) => ({ ...prev, [color]: value }))
                             }
                             placeholder="N"
-                            aria-label={`Fill quantity for ${color}`}
-                            className="w-16 rounded-md border border-slate-200 px-1.5 py-1.5 text-center text-xs outline-none focus:border-sky-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                            ariaLabel={`Fill quantity for ${color}`}
+                            dense
                           />
                           <button
                             type="button"

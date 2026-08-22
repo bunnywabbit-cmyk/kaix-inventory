@@ -3,6 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { invalidBoxClass, invalidInputClass } from '../../lib/formValidation'
+import { usesSilkscreen } from '../../lib/printType'
 import { formatScreenNumber } from '../../lib/screenNumber'
 import { screenStatusLabels } from '../../lib/screenStatus'
 import type { PhysicalScreen, ScreenStatus } from '../../types/api'
@@ -75,7 +76,7 @@ function ScreenFormModal({
   const designsForPicker = useMemo(() => {
     const screenColorwayIds = new Set(screen?.colorways.map((c) => c.id) ?? [])
     const list: ColorwayPickerDesign[] = (designs ?? [])
-      .filter((design) => design.printType === 'SILKSCREEN')
+      .filter((design) => usesSilkscreen(design.printType))
       .map((design) => ({
         id: design.id,
         designName: design.designName,

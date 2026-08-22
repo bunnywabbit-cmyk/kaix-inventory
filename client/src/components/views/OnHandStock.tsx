@@ -106,7 +106,15 @@ function OnHandStock({ searchQuery }: OnHandStockProps) {
     )
   }, [finishedGoods, query])
 
-  const groups = useMemo(() => groupBySizes(filtered), [filtered])
+  // A group that's dropped to zero across every size is out of stock, not
+  // "on hand" — hiding it keeps this page meaning what it says. The
+  // underlying FinishedGood rows (and their unitPrice) stay put, so Add
+  // Stock still finds and increments them instead of creating duplicates
+  // once real stock comes back in.
+  const groups = useMemo(
+    () => groupBySizes(filtered).filter((group) => group.totalQuantity > 0),
+    [filtered],
+  )
   const totalUnits = filtered.reduce((sum, item) => sum + item.quantityOnHand, 0)
 
   return (

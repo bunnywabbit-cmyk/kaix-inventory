@@ -5,11 +5,13 @@ import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { DTF_PRINT_SIZE_OPTIONS, dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
 import { invalidBoxClass, invalidInputClass } from '../../lib/formValidation'
+import { usesDtf, usesSilkscreen } from '../../lib/printType'
 import { FIT_STYLE_OPTIONS, type FitStyle } from '../../lib/skuGenerator'
 import type { DtfPrintSize, PrintType, ShirtDesign } from '../../types/api'
 import MaterialPhotoField from '../ui/MaterialPhotoField'
 import Modal from '../ui/Modal'
 import PriceInput from '../ui/PriceInput'
+import QuantityInput from '../ui/QuantityInput'
 
 interface DesignFormModalProps {
   design?: ShirtDesign
@@ -49,17 +51,20 @@ const pillClass = (active: boolean) =>
       : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
   }`
 // Shared column layout for the colorway header and every colorway row below it,
-// so their cells line up. DTF designs get one extra column (Size). Every
-// track besides Color is a fixed width — the header and each row are separate
-// grid containers, so a content-sized (`auto`) track resolves to a different
-// width in each one and the columns drift out of alignment. Color is the one
-// `1fr` track: with no `auto` track alongside it, its share of space depends
-// only on the (identical) container width, not on content, so it still lines
-// up — and it lets the name input fill the row instead of leaving dead space.
-const colorwayGridClass = (printType: PrintType) =>
-  printType === 'DTF'
-    ? 'grid grid-cols-[3rem_1fr_8rem_2rem] items-center gap-3'
-    : 'grid grid-cols-[3rem_1fr_6rem_2rem] items-center gap-3'
+// so their cells line up. DTF designs get one extra column (Size); Hybrid gets
+// both the Size and Screens columns since one colorway carries both placements.
+// Every track besides Color is a fixed width — the header and each row are
+// separate grid containers, so a content-sized (`auto`) track resolves to a
+// different width in each one and the columns drift out of alignment. Color is
+// the one `1fr` track: with no `auto` track alongside it, its share of space
+// depends only on the (identical) container width, not on content, so it
+// still lines up — and it lets the name input fill the row instead of leaving
+// dead space.
+const colorwayGridClass = (printType: PrintType) => {
+  if (printType === 'HYBRID') return 'grid grid-cols-[3rem_1fr_8rem_7rem_2rem] items-center gap-3'
+  if (printType === 'DTF') return 'grid grid-cols-[3rem_1fr_8rem_2rem] items-center gap-3'
+  return 'grid grid-cols-[3rem_1fr_7rem_2rem] items-center gap-3'
+}
 
 function makeColorwayKey() {
   return Math.random().toString(36).slice(2)
@@ -105,7 +110,7 @@ function ColorwayRow({
 
   const nameInvalid = attempted && !draft.colorwayName.trim()
   const photoInvalid = attempted && !draft.file && !draft.imageUrl
-  const dtfSizeInvalid = attempted && printType === 'DTF' && !draft.dtfPrintSize
+  const dtfSizeInvalid = attempted && usesDtf(printType) && !draft.dtfPrintSize
 
   return (
     <div
@@ -160,7 +165,7 @@ function ColorwayRow({
         }`}
       />
 
-      {printType === 'DTF' && (
+      {usesDtf(printType) && (
         <div
           className={`flex flex-wrap justify-center gap-1.5 rounded-lg ${dtfSizeInvalid ? 'p-1 ring-1 ring-red-500' : ''}`}
         >
@@ -182,14 +187,14 @@ function ColorwayRow({
         </div>
       )}
 
-      {printType === 'SILKSCREEN' && (
-        <input
-          type="number"
+      {usesSilkscreen(printType) && (
+        <QuantityInput
           min={1}
-          value={draft.screensNeeded}
-          onChange={(event) => onScreensNeededChange(Math.max(1, Number(event.target.value) || 1))}
-          aria-label={`Screens needed for ${draft.colorwayName || 'this colorway'}`}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+          value={String(draft.screensNeeded)}
+          onChange={(value) => onScreensNeededChange(Math.max(1, Number(value) || 1))}
+          ariaLabel={`Screens needed for ${draft.colorwayName || 'this colorway'}`}
+          dense
+          className="justify-self-center"
         />
       )}
 
@@ -298,7 +303,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
     const hasName = draft.colorwayName.trim().length > 0
     const hasPhoto = Boolean(draft.file || draft.imageUrl)
     if (!hasName || !hasPhoto) return false
-    if (printType === 'DTF' && !draft.dtfPrintSize) return false
+    if (usesDtf(printType) && !draft.dtfPrintSize) return false
     return true
   }
 
@@ -310,7 +315,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
     for (const draft of colorways) {
       if (!isColorwayComplete(draft)) {
         throw new Error(
-          printType === 'DTF'
+          usesDtf(printType)
             ? 'Each colorway needs a name, a photo, and a print size.'
             : 'Each colorway needs both a name and a photo.',
         )
@@ -320,8 +325,8 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
         id: draft.existingId ?? undefined,
         colorwayName: draft.colorwayName.trim(),
         imageUrl,
-        dtfPrintSize: printType === 'DTF' ? draft.dtfPrintSize : null,
-        screensNeeded: printType === 'SILKSCREEN' ? draft.screensNeeded : 1,
+        dtfPrintSize: usesDtf(printType) ? draft.dtfPrintSize : null,
+        screensNeeded: usesSilkscreen(printType) ? draft.screensNeeded : 1,
       })
     }
     return resolved
@@ -431,6 +436,7 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
             >
               <option value="SILKSCREEN">Silkscreen</option>
               <option value="DTF">DTF</option>
+              <option value="HYBRID">Hybrid (DTF front + Silkscreen back)</option>
             </select>
           </div>
           <div>
@@ -440,6 +446,13 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
             <PriceInput id="design-price" value={price} onChange={setPrice} className="mt-1" />
           </div>
         </div>
+
+        {printType === 'HYBRID' && (
+          <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
+            Each colorway below gets both a DTF print size (front) and a screen count (back) —
+            create and link the physical screens from the Screen Rack page once saved.
+          </p>
+        )}
 
         {printType === 'SILKSCREEN' && (
           <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
@@ -494,8 +507,8 @@ function DesignFormModal({ design, onClose, onSuccess }: DesignFormModalProps) {
               >
                 <span>Image</span>
                 <span>Color</span>
-                {printType === 'DTF' && <span>Size</span>}
-                {printType === 'SILKSCREEN' && <span>Screens</span>}
+                {usesDtf(printType) && <span>Size</span>}
+                {usesSilkscreen(printType) && <span>Screens</span>}
                 <span />
               </div>
               {colorways.map((draft) => (

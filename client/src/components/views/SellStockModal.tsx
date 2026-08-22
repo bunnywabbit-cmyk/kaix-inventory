@@ -2,9 +2,9 @@ import { ImageOff, Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
-import { invalidInputClass } from '../../lib/formValidation'
 import type { FinishedGood } from '../../types/api'
 import Modal from '../ui/Modal'
+import QuantityInput from '../ui/QuantityInput'
 import type { StockGroup } from './OnHandStock'
 
 interface SellStockModalProps {
@@ -14,9 +14,6 @@ interface SellStockModalProps {
 }
 
 const labelClass = 'text-xs font-medium text-slate-500'
-const qtyInputClass =
-  'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
-const qtyInputClassInvalid = `mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:bg-slate-950 dark:text-slate-100 ${invalidInputClass}`
 
 function SellStockModal({ group, onClose, onSuccess }: SellStockModalProps) {
   // Skip the extra click when there's only one size to sell from anyway.
@@ -118,20 +115,19 @@ function SellStockModal({ group, onClose, onSuccess }: SellStockModalProps) {
               <span className="font-normal text-slate-400">({selectedSize.quantity} in stock)</span>
             )}
           </label>
-          <input
+          <QuantityInput
             id="sell-quantity"
-            type="number"
             min={1}
             max={selectedSize?.quantity}
             disabled={!selectedSize}
             value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
+            onChange={setQuantity}
             placeholder="0"
-            className={
+            ariaLabel="Quantity to sell"
+            invalid={
               attempted && !(parsedQuantity > 0 && parsedQuantity <= (selectedSize?.quantity ?? 0))
-                ? qtyInputClassInvalid
-                : qtyInputClass
             }
+            className="mt-1 w-full"
           />
           {selectedSize && parsedQuantity > selectedSize.quantity && (
             <p className="mt-1 text-xs text-red-600 dark:text-red-400">

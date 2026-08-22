@@ -10,6 +10,13 @@ datasource db {
 enum PrintType {
   SILKSCREEN
   DTF
+  // One placement printed DTF (front), the other silkscreen (back) — a
+  // HYBRID colorway sets both `dtfPrintSize` and `screensNeeded`/`screens`
+  // on DesignColorway rather than just one, since those fields already
+  // exist unused on whichever type a colorway isn't. See the "usesDtf" /
+  // "usesSilkscreen" helpers (lib/printType.ts on both sides) — nothing
+  // downstream should check `printType === "DTF"` directly anymore.
+  HYBRID
 }
 
 enum ScreenStatus {

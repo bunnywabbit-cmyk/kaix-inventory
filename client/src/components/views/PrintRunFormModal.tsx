@@ -1,14 +1,16 @@
 import { ImageOff, Loader2, Pencil, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { useShirtDesigns } from '../../hooks/useInventory'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useFinishedGoods, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { invalidInputClass } from '../../lib/formValidation'
+import { onHandCoverage } from '../../lib/onHandCoverage'
 import { SIZE_ORDER, sortSizes } from '../../lib/variantMatrix'
 import type { PrintRun } from '../../types/api'
 import Collapse, { COLLAPSE_DURATION_MS } from '../ui/Collapse'
 import { DesignSelect } from '../ui/ColorwayPicker'
 import Modal from '../ui/Modal'
+import QuantityInput from '../ui/QuantityInput'
 
 interface PrintRunFormModalProps {
   printRun?: PrintRun
@@ -44,8 +46,6 @@ const pillClass = (active: boolean) =>
       ? 'border-sky-500 bg-sky-500 text-white'
       : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
   }`
-const qtyInputClass =
-  'w-20 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
 
 function makeItemKey() {
   return Math.random().toString(36).slice(2)
@@ -58,6 +58,10 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
   // carry their own design/colorway info inline, independent of this list)
   // but shouldn't be offered when adding a new line to the run.
   const pickableDesigns = useMemo(() => (designs ?? []).filter((d) => d.active), [designs])
+  // Cross-referenced against the print list on save so the user knows when a
+  // line's exact variation is already sitting in On-Hand Stock — finishing
+  // this run will pull from that stock rather than counting as a fresh print.
+  const { data: finishedGoods } = useFinishedGoods()
 
   const [items, setItems] = useState<ItemDraft[]>(
     () =>
@@ -91,14 +95,14 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [attempted, setAttempted] = useState(false)
-  // Tracks a click on "Add to Run" / "Save Changes" that found the staging
-  // fields incomplete — lights up whichever of those fields are still empty.
+  // Tracks a click on "Add to Print Run" that found the staging fields
+  // incomplete — lights up whichever of those fields are still empty.
   const [attemptedItem, setAttemptedItem] = useState(false)
 
   // Drives the Collapse sections below independently of the staging fields
   // themselves — closing this immediately while the fields still hold their
   // values (cleared a beat later, once the animation finishes) is what makes
-  // "Add to Run" collapse smoothly instead of the content vanishing first and
+  // "Add to Print Run" collapse smoothly instead of the content vanishing first and
   // leaving an empty box to shrink.
   const [designPanelOpen, setDesignPanelOpen] = useState(false)
   const resetTimeoutRef = useRef<number | undefined>(undefined)
@@ -177,8 +181,8 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
     )
   }
 
-  const handleQuantityChange = (sizeOption: string) => (event: ChangeEvent<HTMLInputElement>) =>
-    setQuantities((prev) => ({ ...prev, [sizeOption]: event.target.value }))
+  const handleQuantityChange = (sizeOption: string) => (value: string) =>
+    setQuantities((prev) => ({ ...prev, [sizeOption]: value }))
 
   const orderedSelectedSizes = useMemo(
     () => SIZE_ORDER.filter((sizeOption) => selectedSizes.includes(sizeOption)),
@@ -491,13 +495,12 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                       <span className="w-10 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">
                         {sizeOption}
                       </span>
-                      <input
-                        type="number"
-                        min={0}
+                      <QuantityInput
                         value={quantities[sizeOption] ?? ''}
                         onChange={handleQuantityChange(sizeOption)}
                         placeholder="0"
-                        className={qtyInputClass}
+                        ariaLabel={`Quantity for size ${sizeOption}`}
+                        dense
                       />
                     </div>
                   ))}
@@ -512,7 +515,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                 className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <Plus className="size-4" />
-                {editingKey ? 'Save Changes' : 'Add to Run'}
+                Add to Print Run
               </button>
               {editingKey && (
                 <button
@@ -526,7 +529,7 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
             </div>
             {attemptedItem && !canAddItem && (
               <p className="text-xs text-red-600 dark:text-red-400">
-                Fill in the highlighted fields to {editingKey ? 'save changes' : 'add this design'}.
+                Fill in the highlighted fields to {editingKey ? 'update this design' : 'add this design'}.
               </p>
             )}
           </div>
@@ -555,13 +558,22 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
               ) : (
                 items.map((item) => {
                   const imageUrl = item.colorwayImageUrl || item.mainProductImage
+                  const coverageBySize = new Map(
+                    item.sizes.map((entry) => [
+                      entry.size,
+                      onHandCoverage(item, entry.size, entry.quantity, finishedGoods ?? []),
+                    ]),
+                  )
+                  const hasOnHandMatch = [...coverageBySize.values()].some((covered) => covered > 0)
                   return (
                     <div
                       key={item.key}
                       className={`flex overflow-hidden rounded-lg border transition-colors ${
                         item.key === editingKey
                           ? 'border-sky-400 ring-1 ring-sky-400 dark:border-sky-500 dark:ring-sky-500'
-                          : 'border-slate-200 dark:border-slate-800'
+                          : hasOnHandMatch
+                            ? 'border-amber-300 dark:border-amber-500/40'
+                            : 'border-slate-200 dark:border-slate-800'
                       }`}
                     >
                       {imageUrl ? (
@@ -581,16 +593,36 @@ function PrintRunFormModal({ printRun, onClose, onSuccess }: PrintRunFormModalPr
                         <div className="mt-1.5 flex flex-wrap items-center gap-1">
                           {sortSizes(item.sizes.map((s) => s.size)).map((size) => {
                             const entry = item.sizes.find((s) => s.size === size)!
+                            const covered = coverageBySize.get(size) ?? 0
                             return (
                               <span
                                 key={size}
-                                className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                                title={
+                                  covered > 0
+                                    ? `${covered} of ${entry.quantity} already on hand — will deduct from stock instead of a fresh print`
+                                    : undefined
+                                }
+                                className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${
+                                  covered > 0
+                                    ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
+                                    : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
+                                }`}
                               >
                                 {size} × {entry.quantity} pc{entry.quantity === 1 ? '' : 's'}
+                                {covered > 0 && (
+                                  <span className="ml-1">
+                                    &middot; {covered}/{entry.quantity} on hand
+                                  </span>
+                                )}
                               </span>
                             )
                           })}
                         </div>
+                        {hasOnHandMatch && (
+                          <p className="mt-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            Already on hand — finishing will deduct from stock instead of a fresh print.
+                          </p>
+                        )}
                       </div>
                       <div className="mr-1.5 mt-1.5 flex h-fit shrink-0 items-center gap-0.5">
                         <button

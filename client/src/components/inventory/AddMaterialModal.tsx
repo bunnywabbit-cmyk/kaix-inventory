@@ -10,6 +10,7 @@ import type { RawMaterial } from '../../types/api'
 import MaterialPhotoField from '../ui/MaterialPhotoField'
 import Modal from '../ui/Modal'
 import PriceInput from '../ui/PriceInput'
+import QuantityInput from '../ui/QuantityInput'
 import ColorTagInput from './ColorTagInput'
 import VariantMatrix from './VariantMatrix'
 
@@ -270,13 +271,12 @@ function AddMaterialModal({ onClose, onSuccess }: AddMaterialModalProps) {
                 <label className={labelClass} htmlFor="sm-quantity">
                   Quantity
                 </label>
-                <input
+                <QuantityInput
                   id="sm-quantity"
-                  type="number"
-                  min={0}
                   value={supplyQuantity}
-                  onChange={(event) => setSupplyQuantity(event.target.value)}
-                  className={inputClass}
+                  onChange={setSupplyQuantity}
+                  ariaLabel="Quantity"
+                  className="mt-1 w-full"
                 />
               </div>
               <div>

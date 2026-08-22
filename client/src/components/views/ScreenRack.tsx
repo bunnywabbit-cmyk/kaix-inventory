@@ -2,6 +2,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ImageOff, Pencil, Plus } from '
 import { useMemo, useState } from 'react'
 import { useScreens, useShirtDesigns } from '../../hooks/useInventory'
 import { cldThumb } from '../../lib/cloudinaryImage'
+import { usesSilkscreen } from '../../lib/printType'
 import { formatScreenNumber } from '../../lib/screenNumber'
 import { screenStatusLabels, screenStatusStyles } from '../../lib/screenStatus'
 import type { PhysicalScreen } from '../../types/api'
@@ -101,7 +102,7 @@ function ScreenRack({ searchQuery }: ScreenRackProps) {
   const colorwayShortfalls = useMemo(() => {
     if (!designs) return []
     return designs
-      .filter((design) => design.printType === 'SILKSCREEN')
+      .filter((design) => usesSilkscreen(design.printType))
       .flatMap((design) =>
         design.colorways
           .filter((colorway) => colorway.screens.length < colorway.screensNeeded)

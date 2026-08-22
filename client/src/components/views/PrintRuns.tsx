@@ -1,8 +1,9 @@
 import { CheckCircle2, ChevronDown, Circle, ImageOff, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { usePrintRuns, useRawMaterials, useShirtDesigns } from '../../hooks/useInventory'
+import { useFinishedGoods, usePrintRuns, useRawMaterials, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
+import { onHandCoverage } from '../../lib/onHandCoverage'
 import { printRunStatusLabels, printRunStatusStyles } from '../../lib/printRunStatus'
 import { sortSizes } from '../../lib/variantMatrix'
 import type { PrintRun, PrintRunItem } from '../../types/api'
@@ -21,13 +22,18 @@ const actionButtonClass =
 
 function PrintRuns({ searchQuery }: PrintRunsProps) {
   const { data: printRuns, loading, error, refetch, mutate } = usePrintRuns()
-  // Finishing a run deducts blank-shirt raw materials and (for DTF designs)
-  // on-hand DTF stock, but those live in separately-cached resources — this
-  // component only ever fetches print runs itself, so without refetching
-  // these two explicitly, Raw Materials and DTF Prints would keep showing
-  // pre-deduction numbers until their own 2-minute staleTime lapses.
+  // Finishing a run deducts blank-shirt raw materials, (for DTF designs)
+  // on-hand DTF stock, and — when a line's exact variation was already
+  // sitting in On-Hand Stock — that stock too, but all three live in
+  // separately-cached resources. This component only ever fetches print
+  // runs itself, so without refetching these explicitly, Raw Materials, DTF
+  // Prints, and On-Hand Stock would keep showing pre-deduction numbers until
+  // their own 2-minute staleTime lapses.
   const { refetch: refetchRawMaterials } = useRawMaterials()
   const { refetch: refetchDesigns } = useShirtDesigns()
+  // Also read here (not just refetched) so planned runs can flag lines whose
+  // exact variation is already sitting in On-Hand Stock — see onHandCoverage.
+  const { data: finishedGoods, refetch: refetchFinishedGoods } = useFinishedGoods()
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -58,7 +64,9 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
 
   const showToast = (message: string) => {
     setToastMessage(message)
-    window.setTimeout(() => setToastMessage(null), 3200)
+    // Longer messages (e.g. the on-hand-stock note appended after saving a
+    // print run) need more than the default 3.2s to actually read.
+    window.setTimeout(() => setToastMessage(null), message.length > 80 ? 5500 : 3200)
   }
 
   const filtered = useMemo(() => {
@@ -122,11 +130,20 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
     if (!pendingFinishRun) return
     setFinishing(true)
     try {
-      await api.post(`/print-runs/${pendingFinishRun.id}/finish`)
+      const { stockDeducted } = await api.post<{ stockDeducted: number }>(
+        `/print-runs/${pendingFinishRun.id}/finish`,
+      )
       refetch()
       refetchRawMaterials()
       refetchDesigns()
-      showToast('Finished print run — blanks and DTF stock deducted.')
+      if (stockDeducted > 0) refetchFinishedGoods()
+      showToast(
+        `Finished print run — blanks and DTF stock deducted${
+          stockDeducted > 0
+            ? `, ${stockDeducted} pc${stockDeducted === 1 ? '' : 's'} fulfilled from on-hand stock`
+            : ''
+        }.`,
+      )
       setPendingFinishRun(null)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not finish. Please try again.')
@@ -243,12 +260,31 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
                         (size) => item.sizes.find((s) => s.size === size)!,
                       )
                       const itemTotal = item.sizes.reduce((sum, s) => sum + s.quantity, 0)
+                      // Only meaningful for a still-planned run — a finished
+                      // run's on-hand deduction (if any) already happened at
+                      // finish time, so re-checking current stock here would
+                      // just be stale noise, not a preview of what will happen.
+                      const coverageBySize = isPlanned
+                        ? new Map(
+                            sizes.map((entry) => [
+                              entry.size,
+                              onHandCoverage(item, entry.size, entry.quantity, finishedGoods ?? []),
+                            ]),
+                          )
+                        : null
+                      const hasOnHandMatch = coverageBySize
+                        ? [...coverageBySize.values()].some((covered) => covered > 0)
+                        : false
 
                       return (
                         <div
                           key={item.id}
                           className={`flex flex-wrap items-center gap-3 px-4 py-3 transition-colors ${
-                            item.done ? 'bg-emerald-50/60 dark:bg-emerald-500/5' : ''
+                            item.done
+                              ? 'bg-emerald-50/60 dark:bg-emerald-500/5'
+                              : hasOnHandMatch
+                                ? 'bg-amber-50/60 dark:bg-amber-500/5'
+                                : ''
                           }`}
                         >
                           {imageUrl ? (
@@ -272,18 +308,40 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
                             <p className="truncate text-xs text-slate-500">
                               {[item.colorway?.colorwayName ?? item.color, item.garmentStyle].join(' · ')}
                             </p>
+                            {hasOnHandMatch && (
+                              <p className="truncate text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                Already on hand — will deduct, not reprint
+                              </p>
+                            )}
                           </div>
 
                           <div className={`flex flex-1 flex-wrap items-center gap-1.5 ${item.done ? 'opacity-60' : ''}`}>
-                            {sizes.map((entry) => (
-                              <span
-                                key={entry.id}
-                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                              >
-                                {entry.size}{' '}
-                                <span className="tabular-nums text-slate-900 dark:text-white">{entry.quantity}</span>
-                              </span>
-                            ))}
+                            {sizes.map((entry) => {
+                              const covered = coverageBySize?.get(entry.size) ?? 0
+                              return (
+                                <span
+                                  key={entry.id}
+                                  title={
+                                    covered > 0
+                                      ? `${covered} of ${entry.quantity} already on hand — will deduct from stock instead of a fresh print`
+                                      : undefined
+                                  }
+                                  className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                                    covered > 0
+                                      ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
+                                      : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {entry.size}{' '}
+                                  <span
+                                    className={`tabular-nums ${covered > 0 ? '' : 'text-slate-900 dark:text-white'}`}
+                                  >
+                                    {entry.quantity}
+                                  </span>
+                                  {covered > 0 && <span className="ml-1">&middot; {covered}/{entry.quantity}</span>}
+                                </span>
+                              )
+                            })}
                           </div>
 
                           <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-400">
@@ -347,7 +405,7 @@ function PrintRuns({ searchQuery }: PrintRunsProps) {
       {pendingFinishRun && (
         <ConfirmDialog
           title="Finish this print run?"
-          message="This deducts the printed quantities from the matching blanks in Raw Materials for every design in this run — and, for DTF designs, from their on-hand print stock too — then locks it as complete. This cannot be undone."
+          message="This deducts the printed quantities from the matching blanks in Raw Materials for every design in this run — and, for DTF designs, from their on-hand print stock too. Any line whose exact variation is already sitting in On-Hand Stock also gets deducted there, as if that order was fulfilled from the shelf. Then it locks the run as complete. This cannot be undone."
           confirmLabel="Finish Print Run"
           confirming={finishing}
           onConfirm={handleConfirmFinish}

@@ -4,7 +4,7 @@ import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
-import { printTypeLabels, printTypeStyles } from '../../lib/printType'
+import { printTypeLabels, printTypeStyles, usesDtf, usesSilkscreen } from '../../lib/printType'
 import { formatScreenNumber } from '../../lib/screenNumber'
 import { screenStatusLabels, screenStatusStyles } from '../../lib/screenStatus'
 import type { ShirtDesign } from '../../types/api'
@@ -142,7 +142,7 @@ function Designs({ searchQuery }: DesignsProps) {
                 )}
               </div>
 
-              {design.printType === 'SILKSCREEN' && (
+              {usesSilkscreen(design.printType) && (
                 <div className="flex items-start gap-1.5">
                   <Frame className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
                   {design.colorways.length === 0 ? (
@@ -181,7 +181,7 @@ function Designs({ searchQuery }: DesignsProps) {
                 </div>
               )}
 
-              {design.printType === 'DTF' && (
+              {usesDtf(design.printType) && (
                 <div className="flex items-start gap-1.5">
                   <Send className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
                   {design.colorways.length === 0 ? (

@@ -1,18 +1,16 @@
 import { Loader2 } from 'lucide-react'
-import { useCallback, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { api } from '../../lib/api'
 import { analyzeVariantGroup } from '../../lib/variantMatrix'
 import type { RawMaterial } from '../../types/api'
 import Modal from '../ui/Modal'
+import QuantityInput from '../ui/QuantityInput'
 
 interface UseStockModalProps {
   items: RawMaterial[]
   onClose: () => void
   onSuccess: (message: string, updatedItems: RawMaterial[]) => void
 }
-
-const deltaInputClass =
-  'w-16 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
 
 function UseStockModal({ items, onClose, onSuccess }: UseStockModalProps) {
   const first = items[0]!
@@ -25,8 +23,8 @@ function UseStockModal({ items, onClose, onSuccess }: UseStockModalProps) {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const handleDeltaChange = (id: string) => (event: ChangeEvent<HTMLInputElement>) =>
-    setDeltas((prev) => ({ ...prev, [id]: event.target.value }))
+  const handleDeltaChange = (id: string) => (value: string) =>
+    setDeltas((prev) => ({ ...prev, [id]: value }))
 
   const rawUsage = useCallback(
     (item: RawMaterial) => Math.max(0, Math.trunc(Number(deltas[item.id]) || 0)),
@@ -92,16 +90,16 @@ function UseStockModal({ items, onClose, onSuccess }: UseStockModalProps) {
               <label className="text-xs font-medium text-slate-500" htmlFor="use-amount">
                 Amount Used
               </label>
-              <input
+              <QuantityInput
                 id="use-amount"
-                type="number"
-                min={0}
                 max={first.quantity}
                 autoFocus
                 value={deltas[first.id] ?? ''}
                 onChange={handleDeltaChange(first.id)}
                 placeholder="0"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                ariaLabel="Amount used"
+                accent="red"
+                className="mt-1 w-full"
               />
             </div>
           </div>
@@ -136,18 +134,17 @@ function UseStockModal({ items, onClose, onSuccess }: UseStockModalProps) {
                           {item ? (
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[10px] text-slate-400">{item.quantity} on hand</span>
-                              <input
-                                type="number"
-                                min={0}
+                              <QuantityInput
                                 max={item.quantity}
                                 disabled={item.quantity === 0}
                                 value={deltas[item.id] ?? ''}
                                 onChange={handleDeltaChange(item.id)}
                                 placeholder="0"
                                 title={item.sku}
-                                className={`${deltaInputClass} ${
-                                  rawUsage(item) > item.quantity ? 'border-red-500' : ''
-                                }`}
+                                ariaLabel={`Amount used for ${item.sku}`}
+                                accent="red"
+                                invalid={rawUsage(item) > item.quantity}
+                                dense
                               />
                             </div>
                           ) : (
@@ -180,15 +177,16 @@ function UseStockModal({ items, onClose, onSuccess }: UseStockModalProps) {
                       {item.quantity} on hand &middot; {item.sku}
                     </p>
                   </div>
-                  <input
-                    type="number"
-                    min={0}
+                  <QuantityInput
                     max={item.quantity}
                     disabled={item.quantity === 0}
                     value={deltas[item.id] ?? ''}
                     onChange={handleDeltaChange(item.id)}
                     placeholder="0"
-                    className={`${deltaInputClass} ${rawUsage(item) > item.quantity ? 'border-red-500' : ''}`}
+                    ariaLabel={`Amount used for ${label || item.sku}`}
+                    accent="red"
+                    invalid={rawUsage(item) > item.quantity}
+                    dense
                   />
                 </div>
               )

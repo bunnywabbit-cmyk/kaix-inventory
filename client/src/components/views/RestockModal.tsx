@@ -1,19 +1,17 @@
 import { Loader2 } from 'lucide-react'
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { api } from '../../lib/api'
 import { generateVariantSku } from '../../lib/skuGenerator'
 import { analyzeVariantGroup, cellKey, SIZE_ORDER, sortSizes } from '../../lib/variantMatrix'
 import type { RawMaterial } from '../../types/api'
 import Modal from '../ui/Modal'
+import QuantityInput from '../ui/QuantityInput'
 
 interface RestockModalProps {
   items: RawMaterial[]
   onClose: () => void
   onSuccess: (message: string, updatedItems: RawMaterial[]) => void
 }
-
-const deltaInputClass =
-  'w-16 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
 
 function RestockModal({ items, onClose, onSuccess }: RestockModalProps) {
   const first = items[0]!
@@ -44,10 +42,10 @@ function RestockModal({ items, onClose, onSuccess }: RestockModalProps) {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const handleDeltaChange = (id: string) => (event: ChangeEvent<HTMLInputElement>) =>
-    setDeltas((prev) => ({ ...prev, [id]: event.target.value }))
-  const handleNewQuantityChange = (key: string) => (event: ChangeEvent<HTMLInputElement>) =>
-    setNewQuantities((prev) => ({ ...prev, [key]: event.target.value }))
+  const handleDeltaChange = (id: string) => (value: string) =>
+    setDeltas((prev) => ({ ...prev, [id]: value }))
+  const handleNewQuantityChange = (key: string) => (value: string) =>
+    setNewQuantities((prev) => ({ ...prev, [key]: value }))
 
   const parsedAdjustments = useMemo(
     () =>
@@ -142,15 +140,15 @@ function RestockModal({ items, onClose, onSuccess }: RestockModalProps) {
               <label className="text-xs font-medium text-slate-500" htmlFor="restock-amount">
                 Amount to Add
               </label>
-              <input
+              <QuantityInput
                 id="restock-amount"
-                type="number"
-                min={0}
                 autoFocus
                 value={deltas[first.id] ?? ''}
                 onChange={handleDeltaChange(first.id)}
                 placeholder="0"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                ariaLabel="Amount to add"
+                accent="emerald"
+                className="mt-1 w-full"
               />
             </div>
           </div>
@@ -217,24 +215,25 @@ function RestockModal({ items, onClose, onSuccess }: RestockModalProps) {
                                 {item ? `${item.quantity} on hand` : 'not stocked'}
                               </span>
                               {item ? (
-                                <input
-                                  type="number"
-                                  min={0}
+                                <QuantityInput
                                   value={deltas[item.id] ?? ''}
                                   onChange={handleDeltaChange(item.id)}
                                   placeholder="0"
                                   title={item.sku}
-                                  className={deltaInputClass}
+                                  ariaLabel={`Amount to add for ${item.sku}`}
+                                  accent="emerald"
+                                  dense
                                 />
                               ) : (
-                                <input
-                                  type="number"
-                                  min={0}
+                                <QuantityInput
                                   value={newQuantities[key] ?? ''}
                                   onChange={handleNewQuantityChange(key)}
                                   placeholder="0"
                                   title={`New: ${generateVariantSku(first.brand ?? '', first.styleNumber ?? '', color, size)}`}
-                                  className={`${deltaInputClass} border-dashed`}
+                                  ariaLabel={`New quantity for ${color} ${size}`}
+                                  accent="emerald"
+                                  dense
+                                  className="border-dashed"
                                 />
                               )}
                             </div>
@@ -264,13 +263,13 @@ function RestockModal({ items, onClose, onSuccess }: RestockModalProps) {
                       {item.quantity} on hand &middot; {item.sku}
                     </p>
                   </div>
-                  <input
-                    type="number"
-                    min={0}
+                  <QuantityInput
                     value={deltas[item.id] ?? ''}
                     onChange={handleDeltaChange(item.id)}
                     placeholder="0"
-                    className={deltaInputClass}
+                    ariaLabel={`Amount to add for ${label || item.sku}`}
+                    accent="emerald"
+                    dense
                   />
                 </div>
               )

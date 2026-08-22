@@ -4,6 +4,7 @@ import { useDtfPrintOrders, useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
 import { dtfPrintSizeLabels } from '../../lib/dtfPrintSize'
+import { usesDtf } from '../../lib/printType'
 import type { DtfPrintOrder } from '../../types/api'
 import AsyncState from '../ui/AsyncState'
 import ConfirmDialog from '../ui/ConfirmDialog'
@@ -33,7 +34,7 @@ function DtfPrints({ searchQuery }: DtfPrintsProps) {
   const stockRows = useMemo(() => {
     if (!designs) return []
     return designs
-      .filter((design) => design.printType === 'DTF')
+      .filter((design) => usesDtf(design.printType))
       .flatMap((design) =>
         design.colorways
           .filter((colorway) => colorway.dtfStockQuantity > 0)

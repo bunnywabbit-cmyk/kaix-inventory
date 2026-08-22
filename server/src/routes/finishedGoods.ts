@@ -5,6 +5,7 @@ import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
 import { SALES_LIST_CACHE_PREFIX } from "../routes/sales.js";
 import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCacheKey, invalidateCachePattern } from "../services/CacheService.js";
+import { recordFinishedGoodSale } from "../services/SaleService.js";
 import { idParamSchema } from "../validators/common.js";
 import {
   adjustStockSchema,
@@ -14,13 +15,16 @@ import {
 
 export const finishedGoodsRouter = Router();
 
-const LIST_CACHE_KEY = "finished-goods:list";
+// Exported so printRuns.ts's finish route — which can also deduct on-hand
+// stock, when a run's order was fulfilled from existing stock instead of a
+// fresh print — can invalidate this cache too.
+export const FINISHED_GOODS_LIST_CACHE_KEY = "finished-goods:list";
 const LIST_CACHE_TTL_SECONDS = 60;
 
 finishedGoodsRouter.get(
   "/",
   asyncHandler(async (_req, res) => {
-    const finishedGoods = await getOrSetCache(LIST_CACHE_KEY, LIST_CACHE_TTL_SECONDS, () =>
+    const finishedGoods = await getOrSetCache(FINISHED_GOODS_LIST_CACHE_KEY, LIST_CACHE_TTL_SECONDS, () =>
       prisma.finishedGood.findMany({
         orderBy: { createdAt: "desc" },
         include: { design: true, colorway: true },
@@ -50,7 +54,7 @@ finishedGoodsRouter.post(
       data,
       include: { design: true, colorway: true },
     });
-    invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(FINISHED_GOODS_LIST_CACHE_KEY);
     logActivity({
       action: "CREATE",
       entityType: "FinishedGood",
@@ -72,7 +76,7 @@ finishedGoodsRouter.patch(
       data,
       include: { design: true, colorway: true },
     });
-    invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(FINISHED_GOODS_LIST_CACHE_KEY);
     logActivity({
       action: "UPDATE",
       entityType: "FinishedGood",
@@ -107,20 +111,19 @@ finishedGoodsRouter.post(
       // a positive delta, which is new stock coming in) — log it so revenue
       // reporting has something real to work with.
       if (delta < 0) {
-        const quantity = -delta;
-        await tx.sale.create({
-          data: {
-            finishedGoodId: current.id,
+        await recordFinishedGoodSale(
+          tx,
+          {
+            id: current.id,
             designId: current.designId,
             designName: current.design.designName,
             garmentStyle: current.garmentStyle,
             color: current.color,
             size: current.size,
-            quantity,
             unitPrice: current.unitPrice,
-            totalPrice: current.unitPrice !== null ? current.unitPrice * quantity : null,
           },
-        });
+          -delta,
+        );
       }
 
       return tx.finishedGood.update({
@@ -130,7 +133,7 @@ finishedGoodsRouter.post(
       });
     }, TRANSACTION_OPTIONS);
 
-    invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(FINISHED_GOODS_LIST_CACHE_KEY);
     if (delta < 0) invalidateCachePattern(SALES_LIST_CACHE_PREFIX);
     logActivity({
       action: "STOCK_ADJUST",
@@ -151,7 +154,7 @@ finishedGoodsRouter.delete(
       where: { id },
       include: { design: true },
     });
-    invalidateCacheKey(LIST_CACHE_KEY);
+    invalidateCacheKey(FINISHED_GOODS_LIST_CACHE_KEY);
     logActivity({
       action: "DELETE",
       entityType: "FinishedGood",

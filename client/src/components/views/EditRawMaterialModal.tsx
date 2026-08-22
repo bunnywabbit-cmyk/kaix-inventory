@@ -8,6 +8,7 @@ import type { RawMaterial } from '../../types/api'
 import MaterialPhotoField from '../ui/MaterialPhotoField'
 import Modal from '../ui/Modal'
 import PriceInput from '../ui/PriceInput'
+import QuantityInput from '../ui/QuantityInput'
 
 interface EditRawMaterialModalProps {
   material: RawMaterial
@@ -151,14 +152,12 @@ function EditRawMaterialModal({ material, onClose, onSuccess }: EditRawMaterialM
             <label className={labelClass} htmlFor="rm-quantity">
               Quantity
             </label>
-            <input
+            <QuantityInput
               id="rm-quantity"
-              type="number"
-              min={0}
-              required
               value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              className={inputClass}
+              onChange={setQuantity}
+              ariaLabel="Quantity"
+              className="mt-1 w-full"
             />
           </div>
           <div>

@@ -1,5 +1,5 @@
 import { ImageOff, Loader2 } from 'lucide-react'
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
 import { cldThumb } from '../../lib/cloudinaryImage'
@@ -10,6 +10,7 @@ import Collapse from '../ui/Collapse'
 import { DesignSelect } from '../ui/ColorwayPicker'
 import Modal from '../ui/Modal'
 import PriceInput from '../ui/PriceInput'
+import QuantityInput from '../ui/QuantityInput'
 
 interface AddStockModalProps {
   finishedGoods: FinishedGood[]
@@ -27,8 +28,6 @@ const pillClass = (active: boolean) =>
       ? 'border-sky-500 bg-sky-500 text-white'
       : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
   }`
-const qtyInputClass =
-  'w-20 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100'
 
 function AddStockModal({ finishedGoods, onClose, onSuccess }: AddStockModalProps) {
   const { data: designs } = useShirtDesigns()
@@ -75,8 +74,8 @@ function AddStockModal({ finishedGoods, onClose, onSuccess }: AddStockModalProps
     )
   }
 
-  const handleQuantityChange = (sizeOption: string) => (event: ChangeEvent<HTMLInputElement>) =>
-    setQuantities((prev) => ({ ...prev, [sizeOption]: event.target.value }))
+  const handleQuantityChange = (sizeOption: string) => (value: string) =>
+    setQuantities((prev) => ({ ...prev, [sizeOption]: value }))
 
   const orderedSelectedSizes = useMemo(
     () => SIZE_ORDER.filter((sizeOption) => selectedSizes.includes(sizeOption)),
@@ -291,13 +290,12 @@ function AddStockModal({ finishedGoods, onClose, onSuccess }: AddStockModalProps
                   <span className="w-10 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {sizeOption}
                   </span>
-                  <input
-                    type="number"
-                    min={0}
+                  <QuantityInput
                     value={quantities[sizeOption] ?? ''}
                     onChange={handleQuantityChange(sizeOption)}
                     placeholder="0"
-                    className={qtyInputClass}
+                    ariaLabel={`Quantity for size ${sizeOption}`}
+                    dense
                   />
                 </div>
               ))}
