@@ -6,7 +6,11 @@ import { prisma, TRANSACTION_OPTIONS } from "../lib/prisma.js";
 import { logActivity } from "../services/ActivityLogService.js";
 import { getOrSetCache, invalidateCacheKey } from "../services/CacheService.js";
 import { idParamSchema } from "../validators/common.js";
-import { createShirtDesignSchema, updateShirtDesignSchema } from "../validators/shirtDesign.js";
+import {
+  createShirtDesignBatchSchema,
+  createShirtDesignSchema,
+  updateShirtDesignSchema,
+} from "../validators/shirtDesign.js";
 
 export const shirtDesignsRouter = Router();
 
@@ -98,6 +102,45 @@ shirtDesignsRouter.post(
       userId: req.user?.sub,
     });
     res.status(201).json(design);
+  }),
+);
+
+// Mass-upload path: creates several designs (each with its own colorways) in one
+// go, from text details alone — mainProductImage/colorway imageUrl are left blank
+// here (see the validators) and filled in later via the normal Edit form.
+shirtDesignsRouter.post(
+  "/batch",
+  asyncHandler(async (req, res) => {
+    const { items } = createShirtDesignBatchSchema.parse(req.body);
+    const created = await prisma.$transaction(
+      items.map(({ colorways, ...data }) =>
+        prisma.shirtDesign.create({
+          data: {
+            ...data,
+            colorways: colorways
+              ? {
+                  create: colorways.map(({ colorwayName, imageUrl, dtfPrintSize, screensNeeded }) => ({
+                    colorwayName,
+                    imageUrl,
+                    dtfPrintSize,
+                    screensNeeded,
+                  })),
+                }
+              : undefined,
+          },
+          include: { colorways: true },
+        }),
+      ),
+      TRANSACTION_OPTIONS,
+    );
+    invalidateCacheKey(SHIRT_DESIGNS_LIST_CACHE_KEY);
+    logActivity({
+      action: "CREATE",
+      entityType: "ShirtDesign",
+      message: `Added ${created.length} design${created.length === 1 ? "" : "s"} in a batch`,
+      userId: req.user?.sub,
+    });
+    res.status(201).json(created);
   }),
 );
 

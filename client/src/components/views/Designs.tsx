@@ -1,4 +1,15 @@
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Frame, ImageOff, Pencil, Plus, Send } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Frame,
+  ImageOff,
+  Pencil,
+  Plus,
+  Send,
+  Upload,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useShirtDesigns } from '../../hooks/useInventory'
 import { api } from '../../lib/api'
@@ -10,6 +21,7 @@ import { screenStatusLabels, screenStatusStyles } from '../../lib/screenStatus'
 import type { ShirtDesign } from '../../types/api'
 import AsyncState from '../ui/AsyncState'
 import Toast from '../ui/Toast'
+import BulkAddDesignsModal from './BulkAddDesignsModal'
 import DesignFormModal from './DesignFormModal'
 
 interface DesignsProps {
@@ -98,6 +110,7 @@ function Designs({ searchQuery }: DesignsProps) {
   const query = searchQuery.trim().toLowerCase()
 
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false)
   const [editingDesign, setEditingDesign] = useState<ShirtDesign | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -125,6 +138,7 @@ function Designs({ searchQuery }: DesignsProps) {
 
   const handleFormSuccess = (message: string) => {
     setAddModalOpen(false)
+    setBulkAddModalOpen(false)
     setEditingDesign(null)
     refetch()
     showToast(message)
@@ -155,15 +169,26 @@ function Designs({ searchQuery }: DesignsProps) {
             Shirt designs available for pre-order, DTF or silkscreen.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setAddModalOpen(true)}
-          aria-label="Add Design"
-          className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-        >
-          <Plus className="size-4" />
-          <span className="hidden sm:inline">Add Design</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setBulkAddModalOpen(true)}
+            aria-label="Mass Upload Designs"
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <Upload className="size-4" />
+            <span className="hidden sm:inline">Mass Upload</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddModalOpen(true)}
+            aria-label="Add Design"
+            className="flex items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          >
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Add Design</span>
+          </button>
+        </div>
       </div>
 
       {(loading || error) && (
@@ -351,6 +376,10 @@ function Designs({ searchQuery }: DesignsProps) {
 
       {addModalOpen && (
         <DesignFormModal onClose={() => setAddModalOpen(false)} onSuccess={handleFormSuccess} />
+      )}
+
+      {bulkAddModalOpen && (
+        <BulkAddDesignsModal onClose={() => setBulkAddModalOpen(false)} onSuccess={handleFormSuccess} />
       )}
 
       {editingDesign && (
